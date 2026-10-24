@@ -218,3 +218,50 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# local stuff
+**/.local/
+
+# vscode settings
+**/.vscode/
+
+# macOS
+.DS_Store
+
+# models
+*.joblib
+*.pt
+*.pth
+*.pkl
+
+# gzipped logs
+*.log.*.gz
+
+# gzip files
+*.gz
+
+# MyST build outputs
+docs/_build/*
+
+# tests data
+tests/data/
+
+# pixi environments
+.pixi
+*.egg-info
+
+# Ignore dynaconf secret files
+.secrets.*
+
+# AfterPython website rules
+**/_build/
+!afterpython/_website/src/lib/
+afterpython/_website.backup/
+
+# zed settings
+**/.zed/
+
+.claude/
+# pixi environments
+.pixi/*
+!.pixi/config.toml
