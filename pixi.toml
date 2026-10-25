@@ -7,8 +7,8 @@ requires-pixi = ">=0.83.0"
 exclude-newer = "14d"
 
 [pypi-exclude-newer]
-uv_build = "0d"
 afterpython = "0d"
+uv_build = "0d"
 
 [tasks]
 
@@ -21,18 +21,19 @@ depends-on = [
 
 [dependencies]
 
+[pypi-dependencies]
+pydantic = ">=2.14.0"
 
 [environments]
-default = ["py313", "dev", "test", "optional"]
-py313 = ["py313", "test", "optional"]
-py314 = ["py314", "test", "optional"]
-py315 = ["py315", "test", "optional"]
-
-[feature.optional.pypi-dependencies]
+default = ["py313", "dev", "test"]
+py313 = ["py313", "test"]
+py314 = ["py314", "test"]
+py315 = ["py315", "test"]
 
 [feature.dev.pypi-dependencies]
 pfund-blocks = { path = ".", editable = true }
-afterpython = ">=0.4.0"
+afterpython = { path ="../../afterpython.org/afterpython", editable = true }  # TEMP
+# afterpython = ">=0.4.0"
 
 [feature.test.pypi-dependencies]
 pfund-blocks = { path = ".", editable = true }

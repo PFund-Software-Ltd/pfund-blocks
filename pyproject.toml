@@ -1,16 +1,15 @@
 [project]
 name = "pfund-blocks"
-version = "0.0.1.dev1"
+version = "0.0.1"
 description = "Building blocks for `pfund`"
 readme = "README.md"
 authors = [
     { name = "softwareentrepreneer", email = "softwareentrepreneer+pfund-blocks@gmail.com" }
 ]
 requires-python = ">=3.13"
-dependencies = []
-
-[project.scripts]
-pfund-blocks = "pfund_blocks:main"
+dependencies = [
+    "pydantic>=2.14.0",
+]
 
 [build-system]
 requires = ["uv_build>=0.13.5,<0.14.0"]
@@ -18,7 +17,7 @@ build-backend = "uv_build"
 
 [tool.uv]
 exclude-newer = "14 days"
-exclude-newer-package = { uv_build = false }
+exclude-newer-package = { uv_build = false, pfund-kit = false }
 
 [tool.uv.build-backend]
 module-name = "pfund_blocks"
