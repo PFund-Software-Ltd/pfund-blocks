@@ -8,7 +8,8 @@ authors = [
 ]
 requires-python = ">=3.13"
 dependencies = [
-    "pydantic>=2.14.0",
+    "msgspec>=0.22.0",
+    "pydantic>=2.14.1",
 ]
 
 [build-system]
@@ -16,8 +17,9 @@ requires = ["uv_build>=0.13.5,<0.14.0"]
 build-backend = "uv_build"
 
 [tool.uv]
-exclude-newer = "14 days"
-exclude-newer-package = { uv_build = false, pfund-kit = false }
+# FIXME: set it back to "14 days" when the package is stable
+exclude-newer = "0 days"
+exclude-newer-package = { uv_build = false }
 
 [tool.uv.build-backend]
 module-name = "pfund_blocks"
