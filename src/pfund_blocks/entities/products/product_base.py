@@ -147,6 +147,9 @@ class BaseProduct(BaseModel):
 
     is_perp = is_perpetual
 
+    def is_leveraged(self) -> bool:
+        return self.product_type.is_leveraged()
+
     # spot + asset class, same as the aliases STOCK, BOND etc., e.g. is_crypto_spot() is False for a crypto perpetual
     # NOTE: these are shortcuts for simple cases, for exposure instead, e.g. any crypto product, check product_type.asset_class directly
     def is_stock(self) -> bool:

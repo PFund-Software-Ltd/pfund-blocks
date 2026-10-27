@@ -170,6 +170,10 @@ class ProductType(BaseModel):
     def is_perpetual(self) -> bool:
         return AssetModifier.PERPETUAL in self.modifiers
 
+    def is_leveraged(self) -> bool:
+        # NOTE: checks .base since e.g. "3x" is not LEVERAGED itself but has LEVERAGED as its base
+        return any(m.base is AssetModifier.LEVERAGED for m in self.modifiers)
+
     # spot + asset class, same as the aliases STOCK, BOND etc.
     # NOTE: for exposure instead, e.g. a bond ETF, check asset_class directly
     def is_stock(self) -> bool:
