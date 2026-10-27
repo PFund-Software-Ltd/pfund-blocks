@@ -1,52 +1,42 @@
-from __future__ import annotations
-
-from functools import cache
-
-from pfund_blocks.entities.products.mixins.crypto import CryptoMixin
-from pfund_blocks.entities.products.mixins.etf import ETFMixin
-from pfund_blocks.entities.products.mixins.forex import ForexMixin
-from pfund_blocks.entities.products.mixins.future import FutureMixin
-from pfund_blocks.entities.products.mixins.index import IndexMixin
-from pfund_blocks.entities.products.mixins.inverse import InverseMixin
-from pfund_blocks.entities.products.mixins.option import OptionMixin
-from pfund_blocks.entities.products.mixins.perpetual import PerpetualMixin
-from pfund_blocks.entities.products.mixins.stock import StockMixin
+from pfund_blocks.entities.products.fund import ETFProduct, MutualFundProduct
+from pfund_blocks.entities.products.future import FutureProduct, PerpetualProduct
+from pfund_blocks.entities.products.index import IndexProduct
+from pfund_blocks.entities.products.option import OptionProduct
 from pfund_blocks.entities.products.product_base import BaseProduct
-from pfund_blocks.enums.asset_type_DEPRECATED import AllAssetType, AssetTypeModifier
+from pfund_blocks.entities.products.product_basis import ProductBasis
+from pfund_blocks.entities.products.spot import (
+    CryptoProduct,
+    ForexProduct,
+    SpotProduct,
+    StockProduct,
+)
+from pfund_blocks.enums.asset import AssetType
 
-_MIXINS: dict[AssetTypeModifier | AllAssetType, type] = {
-    AssetTypeModifier.INVERSE: InverseMixin,
-    AllAssetType.INDEX: IndexMixin,
-    AllAssetType.ETF: ETFMixin,
-    AllAssetType.STOCK: StockMixin,
-    AllAssetType.FUTURE: FutureMixin,
-    AllAssetType.PERPETUAL: PerpetualMixin,
-    AllAssetType.OPTION: OptionMixin,
-    AllAssetType.FOREX: ForexMixin,
-    AllAssetType.CRYPTO: CryptoMixin,
+_PRODUCTS: dict[AssetType, type[BaseProduct]] = {
+    AssetType.SPOT: SpotProduct,
+    AssetType.ETF: ETFProduct,
+    AssetType.MUTUAL_FUND: MutualFundProduct,
+    AssetType.FUTURE: FutureProduct,
+    AssetType.OPTION: OptionProduct,
+    AssetType.INDEX: IndexProduct,
 }
 
 
-@cache
-def _build_product_class(
-    Product: type[BaseProduct],
-    mixins: tuple[type, ...],
-) -> type[BaseProduct]:
-    class_name = (
-        Product.__name__.replace("Product", "")
-        + "".join(m.__name__.replace("Mixin", "") for m in mixins)
-        + "Product"
-    )
-    return type(class_name, (Product, *mixins), {"__module__": __name__})
-
-
-def ProductFactory(
-    basis: str, Product: type[BaseProduct] = BaseProduct
-) -> type[BaseProduct]:
-    from pfund_blocks.entities.products.product_basis import ProductBasis
-
-    asset_type = ProductBasis(basis=basis.upper()).asset_type
-    if asset_type is None:
-        raise ValueError(f"asset type is None for product basis {basis}")
-    mixins = [_MIXINS[t] for t in asset_type]
-    return _build_product_class(Product, tuple(mixins))
+def ProductFactory(basis: str | ProductBasis) -> type[BaseProduct]:  # noqa: N802
+    """Gets the product class of a product basis, e.g. BTC_USDT_PERP -> PerpetualProduct."""
+    if isinstance(basis, str):
+        basis = ProductBasis.model_validate(basis)
+    product_type = basis.product_type
+    # asset type alone is not enough for SPOT and FUTURE, which have more than one class:
+    # SPOT is split further by asset class (e.g. StockProduct), FUTURE by the PERPETUAL modifier
+    if product_type.is_stock():
+        return StockProduct
+    if product_type.is_forex():
+        return ForexProduct
+    if product_type.is_crypto_spot():
+        return CryptoProduct
+    if product_type.is_perpetual():
+        return PerpetualProduct
+    if product_type.asset_type not in _PRODUCTS:
+        raise ValueError(f"no product class for {product_type!r} yet")
+    return _PRODUCTS[product_type.asset_type]
