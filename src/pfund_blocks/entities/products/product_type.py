@@ -82,6 +82,9 @@ class ProductType(BaseModel):
                 raise ValueError(
                     f"invalid token {token!r} in product type {product_type!r}"
                 )
+        # dedupe (keeping order) so that e.g. "SPOT-FX-FOREX" is FOREX, like modifiers are deduped
+        asset_types = list(dict.fromkeys(asset_types))
+        asset_classes = list(dict.fromkeys(asset_classes))
         if len(asset_types) != 1:
             raise ValueError(
                 f"exactly one asset type is required, got {asset_types} in {product_type!r}"
