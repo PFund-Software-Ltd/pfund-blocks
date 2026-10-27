@@ -25,6 +25,7 @@ depends-on = [
 [pypi-dependencies]
 msgspec = ">=0.22.0"
 pydantic = ">=2.14.1"
+python-dotenv = ">=1.2.4"
 
 [environments]
 default = ["py313", "dev", "test"]
