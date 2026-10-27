@@ -1,6 +1,6 @@
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from pfund_blocks.entities.products.product_type import ProductType
 
@@ -34,10 +34,18 @@ class ProductBasis(BaseModel):
             )
         base_asset, quote_asset, product_type = parts
         return {
-            "base_asset": base_asset.upper(),
-            "quote_asset": quote_asset.upper(),
+            "base_asset": base_asset,
+            "quote_asset": quote_asset,
             "product_type": product_type,  # parsed by ProductType's own validator
         }
+
+    @field_validator("base_asset", "quote_asset", mode="before")
+    @classmethod
+    def _uppercase_asset(cls, asset: Any) -> Any:
+        # case-insensitive like the string form, e.g. base_asset="btc" is BTC
+        if isinstance(asset, str):
+            return asset.upper()
+        return asset
 
     @property
     def asset_pair(self) -> str:
