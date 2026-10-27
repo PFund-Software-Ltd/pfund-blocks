@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 from pfund_blocks.entities.accounts.account_base import BaseAccount
-from pfund.enums import TradingVenue
 from pfund_blocks.enums.env import Environment
-from pfund_blocks.utils import DotenvStore
 
 
 # TODO: for FUTURE integration with the US brokers — Tradier, TradeStation, Schwab, Tradovate.
@@ -19,20 +17,28 @@ class OAuthAccount(BaseAccount):
     def __init__(
         self,
         env: Environment | str,
-        venue: TradingVenue | str,
+        venue: str,
         name: str = "",
         token: str = "",
     ):
         super().__init__(env=env, venue=venue, name=name)
-        dotenv = DotenvStore(env=self._env)
-        self._token: str = token or (dotenv.get(f"{self.venue}_ACCESS_TOKEN", "") or "")
-        if self._env in [Environment.PAPER, Environment.LIVE]:
-            if not self._token:
-                raise ValueError(
-                    f"{self.venue} ACCESS TOKEN must be provided, \n"
-                    + f"please set `{self.venue}_ACCESS_TOKEN` in .env.{self._env.lower()} file,\n"
-                    + "or by strategy.add_account(..., token=...)"
-                )
+        self._token: str = token or (self._dotenv.get(f"{self.venue}_ACCESS_TOKEN", "") or "")
+
+    def _assert_no_credential_leak_in_simulated_env(self):
+        if self._token:
+            raise ValueError(
+                f"{self.venue} ACCESS TOKEN should NOT be provided for {self._env} environment, \n"
+                + f"please remove it in .env.{self._env.lower()} file (if any),\n"
+                + "or remove token= from strategy.add_account()"
+            )
+
+    def _assert_credentials_provided_in_paper_or_live_trading_env(self):
+        if not self._token:
+            raise ValueError(
+                f"{self.venue} ACCESS TOKEN must be provided, \n"
+                + f"please set `{self.venue}_ACCESS_TOKEN` in .env.{self._env.lower()} file,\n"
+                + "or by strategy.add_account(..., token=...)"
+            )
 
     @property
     def token(self):

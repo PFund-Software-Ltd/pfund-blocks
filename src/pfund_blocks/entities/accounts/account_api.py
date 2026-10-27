@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from pfund_blocks.entities.accounts.account_base import BaseAccount
-from pfund.enums import TradingVenue
 from pfund_blocks.enums.env import Environment
 
 
@@ -9,7 +8,7 @@ class APIKeyAccount(BaseAccount):
     def __init__(
         self,
         env: Environment | str,
-        venue: TradingVenue | str,
+        venue: str,
         name: str = "",
         key: str = "",
         secret: str = "",
@@ -19,13 +18,14 @@ class APIKeyAccount(BaseAccount):
         self._secret: str = secret or (
             self._dotenv.get(f"{self.venue}_API_SECRET", "") or ""
         )
-        if self._env in [Environment.PAPER, Environment.LIVE]:
-            if not self._key or not self._secret:
-                raise ValueError(
-                    f"{self.venue} API KEY and SECRET must be provided, \n"
-                    + f"please set `{self.venue}_API_KEY` and `{self.venue}_API_SECRET` in .env.{self._env.lower()} file,\n"
-                    + "or by strategy.add_account(..., key=..., secret=...)"
-                )
+
+    def _assert_credentials_provided_in_paper_or_live_trading_env(self):
+        if not self._key or not self._secret:
+            raise ValueError(
+                f"{self.venue} API KEY and SECRET must be provided, \n"
+                + f"please set `{self.venue}_API_KEY` and `{self.venue}_API_SECRET` in .env.{self._env.lower()} file,\n"
+                + "or by strategy.add_account(..., key=..., secret=...)"
+            )
 
     def _assert_no_credential_leak_in_simulated_env(self):
         if self._key or self._secret:
