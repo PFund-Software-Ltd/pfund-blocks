@@ -1,67 +1,48 @@
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from pfund_blocks.entities.products.asset_type import AssetType
+from pfund_blocks.entities.products.product_type import ProductType
+
+# NOT "_" or "-", which are the separators of a product basis
+_ASSET_PATTERN = r"^[A-Z0-9.]+$"
 
 
 class ProductBasis(BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True, frozen=True)
+    model_config = ConfigDict(frozen=True)
 
-    basis: str
-    base_asset: str = ""
-    quote_asset: str = ""
-    asset_type: AssetType | None = None
+    base_asset: str = Field(pattern=_ASSET_PATTERN)  # e.g. BTC, BRK.B, 1000PEPE
+    quote_asset: str = Field(pattern=_ASSET_PATTERN)
+    product_type: ProductType
 
     @model_validator(mode="before")
     @classmethod
-    def _coerce_string(cls, data: Any) -> Any:
-        # allow a bare string (e.g. "BTC_USDT_PERP") to be used wherever a
-        # ProductBasis is expected, by treating it as the `basis` field
+    def _parse_string(cls, data: Any) -> Any:
+        # allow a string (e.g. "BTC_USDT_PERP") wherever a ProductBasis is expected
         if isinstance(data, str):
-            return {"basis": data.upper()}
+            return cls._parse(data)
         return data
 
-    @field_validator("basis", mode="before")
-    @classmethod
-    def validate_product(cls, basis: str) -> str:
-        # use regex to validate product string format, it must be like "XXX_YYY_ZZZ" or "XXX_YYY_ZZZ-ZZZ"
-        # where the maximum length of each part is 10
-        import re
-
-        max_len = 10
-        pattern = (
-            r"^[A-Za-z0-9.]{1,"
-            + str(max_len)
-            + "}"
-            + r"_[A-Za-z]{1,"
-            + str(max_len)
-            + "}"
-            + r"_[A-Za-z]{1,"
-            + str(max_len)
-            + "}"
-            + r"(?:-[A-Za-z]{1,"
-            + str(max_len)
-            + "})?$"
-        )
-        if not re.match(pattern, basis):
+    @staticmethod
+    def _parse(basis: str) -> dict[str, Any]:
+        """Parse e.g. "BTC_USDT_PERP" or "VFIAX_USD_MUTUAL_FUND-EQUITY" into fields."""
+        # maxsplit=2 since the product type itself can contain "_", e.g. MUTUAL_FUND
+        parts = basis.split("_", 2)
+        if len(parts) != 3:
             raise ValueError(
-                f"Invalid product basis format: `{basis}`. "
-                + 'Product basis must be in format "XXX_YYY_ZZZ" or "XXX_YYY_ZZZ-ZZZ" (e.g. "TSLA_USD_STK", "BTC_USDT_SPOT", "ETH_USDT_PERP", "BTC_USD_INVERSE-PERP") where each part contains only letters '
-                + f"and maximum {max_len} characters long."
+                f"invalid product basis {basis!r}, expected {{base_asset}}_{{quote_asset}}_{{product_type}}"
             )
-        return basis
+        base_asset, quote_asset, product_type = parts
+        return {
+            "base_asset": base_asset.upper(),
+            "quote_asset": quote_asset.upper(),
+            "product_type": product_type,  # parsed by ProductType's own validator
+        }
 
-    def model_post_init(self, __context: Any):
-        base_asset, quote_asset, asset_type = self.basis.split("_")
-        asset_type = AssetType(value=asset_type)
-        object.__setattr__(self, "base_asset", base_asset)
-        object.__setattr__(self, "quote_asset", quote_asset)
-        object.__setattr__(self, "asset_type", asset_type)  # Required when frozen=True
+    def __repr__(self) -> str:
+        # fully expanded form, e.g. ProductBasis(BTC_USDT_FUTURE-PERPETUAL)
+        return f"ProductBasis({self.base_asset}_{self.quote_asset}_{self.product_type.canonical})"
 
-    @property
-    def asset_pair(self) -> str:
-        return "_".join([self.base_asset, self.quote_asset])
-
-    def __str__(self):
-        return "_".join([self.asset_pair, str(self.asset_type)])
+    def __str__(self) -> str:
+        # friendly form, e.g. BTC_USDT_PERPETUAL
+        return f"{self.base_asset}_{self.quote_asset}_{self.product_type}"
