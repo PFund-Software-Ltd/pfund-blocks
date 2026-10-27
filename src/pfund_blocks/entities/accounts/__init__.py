@@ -1,4 +1,4 @@
-from pfund_blocks.entities.accounts.account_api import APIKeyAccount
+from pfund_blocks.entities.accounts.api_account import APIKeyAccount
 
 __all__ = [
     "APIKeyAccount",
