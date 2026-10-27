@@ -34,8 +34,15 @@ class ProductTypeAlias(Enum):
     INVERSE_FUTURE = IFUT = IFUTURE = (AssetType.FUTURE, AssetModifier.INVERSE)
 
 
+# user-facing alias strings, e.g. INVERSE-PERPETUAL, since Python names can't contain "-"
+# NOTE: INVERSE_PERPETUAL is rejected, "_" only separates the parts of a product basis
+_ALIASES: dict[str, ProductTypeAlias] = {
+    name.replace("_", _SEPARATOR): alias for name, alias in ProductTypeAlias.__members__.items()
+}
+
+
 class ProductType(BaseModel):
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     asset_type: AssetType
     asset_class: AssetClass | None = None  # None e.g. for OUTCOME
@@ -56,8 +63,8 @@ class ProductType(BaseModel):
         Tokens are classified by which enum they belong to, so their order does not matter,
         e.g. "PERPETUAL-FUTURE-CRYPTO" is the same as "FUTURE-CRYPTO-PERPETUAL".
         """
-        if (alias := product_type.upper()) in ProductTypeAlias.__members__:
-            product_type = _SEPARATOR.join(ProductTypeAlias[alias].value)
+        if alias := _ALIASES.get(product_type.upper()):
+            product_type = _SEPARATOR.join(alias.value)
         tokens = product_type.upper().split(_SEPARATOR)
         asset_types: list[AssetType] = []
         asset_classes: list[AssetClass] = []
@@ -131,7 +138,7 @@ class ProductType(BaseModel):
         # NOTE: iterating an enum skips aliases, so the preferred name (e.g. STOCK, not STK) is used
         for alias in ProductTypeAlias:
             if _SEPARATOR.join(alias.value) == self.canonical:
-                return alias.name
+                return alias.name.replace("_", _SEPARATOR)
         return self.canonical
 
     # asset type
@@ -160,10 +167,6 @@ class ProductType(BaseModel):
     def is_perpetual(self) -> bool:
         return AssetModifier.PERPETUAL in self.modifiers
 
-    def is_leveraged(self) -> bool:
-        """Whether the product has a fixed built-in leverage, e.g. LEVERAGED or 3x."""
-        return any(m.base is AssetModifier.LEVERAGED for m in self.modifiers)
-
     # spot + asset class, same as the aliases STOCK, BOND etc.
     # NOTE: for exposure instead, e.g. a bond ETF, check asset_class directly
     def is_stock(self) -> bool:
@@ -175,10 +178,10 @@ class ProductType(BaseModel):
     def is_forex(self) -> bool:
         return self._is_spot_of(AssetClass.FOREX)
 
-    def is_crypto(self) -> bool:
+    def is_crypto_spot(self) -> bool:
         return self._is_spot_of(AssetClass.CRYPTO)
 
-    def is_commodity(self) -> bool:
+    def is_commodity_spot(self) -> bool:
         return self._is_spot_of(AssetClass.COMMODITY)
 
     def _is_spot_of(self, asset_class: AssetClass) -> bool:

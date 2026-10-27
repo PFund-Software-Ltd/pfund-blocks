@@ -9,7 +9,7 @@ _ASSET_PATTERN = r"^[A-Z0-9.]+$"
 
 
 class ProductBasis(BaseModel):
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     base_asset: str = Field(pattern=_ASSET_PATTERN)  # e.g. BTC, BRK.B, 1000PEPE
     quote_asset: str = Field(pattern=_ASSET_PATTERN)
@@ -38,6 +38,11 @@ class ProductBasis(BaseModel):
             "quote_asset": quote_asset.upper(),
             "product_type": product_type,  # parsed by ProductType's own validator
         }
+
+    @property
+    def asset_pair(self) -> str:
+        # e.g. BTC_USDT, shared by the spot pair and the perpetual
+        return f"{self.base_asset}_{self.quote_asset}"
 
     def __repr__(self) -> str:
         # fully expanded form, e.g. ProductBasis(BTC_USDT_FUTURE-PERPETUAL)
