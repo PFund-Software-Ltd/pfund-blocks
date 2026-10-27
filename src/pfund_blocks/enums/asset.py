@@ -83,6 +83,9 @@ class AssetModifier(StrEnum):
         if not match:
             return None
         leverage = float(match.group(1))
+        # e.g. "0x", a product can't have zero leverage
+        if leverage <= 0:
+            return None
         # normalize e.g. "3.0X" to "3X" so that they are the same modifier
         normalized_value = f"{leverage:g}X"
         if normalized_value in cls._value2member_map_:
