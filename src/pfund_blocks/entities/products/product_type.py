@@ -12,10 +12,11 @@ _SEPARATOR = "-"
 
 def _try_leverage(token: str) -> AssetModifier | None:
     """Leveraged modifier for tokens like "3X", None if the token is not a leverage."""
-    try:
-        return AssetModifier(token)
-    except ValueError:
+    # NOTE: a token starting with a digit can only be a leverage, so its own error is raised,
+    # e.g. "1.123X" has more than 2 decimal places
+    if not token[:1].isdigit():
         return None
+    return AssetModifier(token)
 
 
 class ProductTypeAlias(Enum):
@@ -30,14 +31,19 @@ class ProductTypeAlias(Enum):
     CRYPTO = (AssetType.SPOT, AssetClass.CRYPTO)
     COMMODITY = CMDTY = (AssetType.SPOT, AssetClass.COMMODITY)
     PERPETUAL = PERP = (AssetType.FUTURE, AssetModifier.PERPETUAL)
-    INVERSE_PERPETUAL = IPERP = IPERPETUAL = (AssetType.FUTURE, AssetModifier.INVERSE, AssetModifier.PERPETUAL)
+    INVERSE_PERPETUAL = IPERP = IPERPETUAL = (
+        AssetType.FUTURE,
+        AssetModifier.INVERSE,
+        AssetModifier.PERPETUAL,
+    )
     INVERSE_FUTURE = IFUT = IFUTURE = (AssetType.FUTURE, AssetModifier.INVERSE)
 
 
 # user-facing alias strings, e.g. INVERSE-PERPETUAL, since Python names can't contain "-"
 # NOTE: INVERSE_PERPETUAL is rejected, "_" only separates the parts of a product basis
 _ALIASES: dict[str, ProductTypeAlias] = {
-    name.replace("_", _SEPARATOR): alias for name, alias in ProductTypeAlias.__members__.items()
+    name.replace("_", _SEPARATOR): alias
+    for name, alias in ProductTypeAlias.__members__.items()
 }
 
 
@@ -80,7 +86,7 @@ class ProductType(BaseModel):
                 modifiers.append(leverage)
             else:
                 raise ValueError(
-                    f"invalid token {token!r} in product type {product_type!r}"
+                    f"unknown part {token!r} in product type {product_type!r}"
                 )
         # dedupe (keeping order) so that e.g. "SPOT-FX-FOREX" is FOREX, like modifiers are deduped
         asset_types = list(dict.fromkeys(asset_types))
@@ -129,7 +135,7 @@ class ProductType(BaseModel):
         for modifier in self.modifiers:
             # leverage shows its number, e.g. 3x instead of LEVERAGED
             parts.append(
-                f"{modifier.leverage:g}x" if modifier.leverage is not None else modifier
+                modifier.lower() if modifier.leverage is not None else modifier
             )
         return _SEPARATOR.join(parts)
 
@@ -173,6 +179,9 @@ class ProductType(BaseModel):
     def is_leveraged(self) -> bool:
         # NOTE: checks .base since e.g. "3x" is not LEVERAGED itself but has LEVERAGED as its base
         return any(m.base is AssetModifier.LEVERAGED for m in self.modifiers)
+
+    def is_short(self) -> bool:
+        return AssetModifier.SHORT in self.modifiers
 
     # spot + asset class, same as the aliases STOCK, BOND etc.
     # NOTE: for exposure instead, e.g. a bond ETF, check asset_class directly

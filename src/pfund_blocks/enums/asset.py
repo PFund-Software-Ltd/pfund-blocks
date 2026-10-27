@@ -23,7 +23,10 @@ delivery, are product specs and belong to the product, not here.
 from typing import Self
 
 import re
+from decimal import Decimal
 from enum import StrEnum
+
+from pfund_blocks.utils import trim_trailing_zeros
 
 
 class AssetType(StrEnum):
@@ -62,6 +65,10 @@ class AssetModifier(StrEnum):
     the product itself stays the same.
     Never put position-level leverage here, otherwise the same contract would become different products.
 
+    SHORT is ONLY for product-level short exposure, i.e. a product built to move against its underlying,
+    e.g. SH (-1x S&P 500 ETF) is ETF-EQUITY-SHORT, SQQQ (-3x Nasdaq ETF) is ETF-EQUITY-SHORT-3x.
+    It is NOT a short position, and it is NOT INVERSE, which for futures means coin-margined.
+
     Leverage can be written with its number, e.g. AssetModifier("3x") creates a LEVERAGED modifier
     with value "3X" and leverage 3.0. It is not a declared member, so use `base` (LEVERAGED) for
     member-level logic such as ordering and supported asset types.
@@ -69,6 +76,8 @@ class AssetModifier(StrEnum):
 
     INVERSE = INV = "INVERSE"
     PERPETUAL = PERP = "PERPETUAL"  # future without expiration
+    # product-level short exposure ONLY (e.g. SQQQ), NOT a short position, see docstring
+    SHORT = "SHORT"
     # product-level leverage ONLY (e.g. TQQQ), NOT position-level leverage, see docstring
     LEVERAGED = LEV = "LEVERAGED"
 
@@ -76,24 +85,28 @@ class AssetModifier(StrEnum):
 
     @classmethod
     def _missing_(cls, value: object) -> Self | None:
-        """Create a leveraged modifier on the fly for values like "3x" or "1.5X"."""
+        """Create a leveraged modifier on the fly for values like "3x" or "1.5X", at most 2 decimal places."""
         if not isinstance(value, str):
             return None
-        match = re.fullmatch(r"(\d+(?:\.\d+)?)X", value.upper())
+        match = re.fullmatch(r"(\d+(?:\.(\d+))?)X", value.upper())
         if not match:
             return None
-        leverage = float(match.group(1))
+        # at most 2 decimal places so that the normalized value is exact
+        if (decimals := match.group(2)) and len(decimals) > 2:
+            raise ValueError(f"leverage allows at most 2 decimal places, got {value!r}")
+        leverage = Decimal(match.group(1))
         # e.g. "0x", a product can't have zero leverage
         if leverage <= 0:
             return None
         # normalize e.g. "3.0X" to "3X" so that they are the same modifier
-        normalized_value = f"{leverage:g}X"
+        # NOTE: not f"{leverage:g}", which gives e.g. "1e+06" and drops digits after 6 significant ones
+        normalized_value = f"{trim_trailing_zeros(leverage)}X"
         if normalized_value in cls._value2member_map_:
             return cls(normalized_value)
         member = str.__new__(cls, normalized_value)
         member._name_ = f"LEVERAGED_{normalized_value}"
         member._value_ = normalized_value
-        member._leverage = leverage
+        member._leverage = float(leverage)
         cls._value2member_map_[normalized_value] = member
         return member
 
@@ -113,5 +126,6 @@ class AssetModifier(StrEnum):
         return {
             AssetModifier.INVERSE: frozenset({AssetType.FUTURE, AssetType.OPTION}),
             AssetModifier.PERPETUAL: frozenset({AssetType.FUTURE}),
+            AssetModifier.SHORT: frozenset({AssetType.ETF}),
             AssetModifier.LEVERAGED: frozenset({AssetType.ETF}),
         }[self.base]
