@@ -1,6 +1,6 @@
 from typing import Any, NamedTuple, Self
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from pfund_blocks.entities.products.product_basis import ProductBasis
 from pfund_blocks.entities.products.product_type import ProductType
@@ -23,7 +23,7 @@ class BaseProduct(BaseModel):
 
     source: str = Field(
         description="""
-            where the product comes from, either a trading venue (e.g. BYBIT, IBKR) or a data source (e.g. YAHOO_FINANCE).
+            where the product comes from, either a trading venue (e.g. BYBIT, HYPERLIQUID) or a data source (e.g. YAHOO_FINANCE).
             Whether the source is a trading venue is up to the consumer to decide, e.g. pfund checks it against its TradingVenue enum.
         """,
     )
@@ -41,6 +41,14 @@ class BaseProduct(BaseModel):
         default="",
         description="unique product name, if not provided, source + symbol will be used",
     )
+
+    @field_validator("source", "exchange", mode="before")
+    @classmethod
+    def _uppercase(cls, value: Any) -> Any:
+        # case-insensitive, e.g. source="bybit" is BYBIT, otherwise the same product would not be equal
+        if isinstance(value, str):
+            return value.upper()
+        return value
 
     @model_validator(mode="after")
     def _derive_symbol_and_name(self) -> Self:
@@ -105,7 +113,10 @@ class BaseProduct(BaseModel):
     @property
     def specs(self) -> dict[str, Any]:
         """Specifications that make a product unique, e.g. for options, strike_price, expiration etc."""
-        return {field_name: getattr(self, field_name) for field_name in sorted(self.get_allowed_specs())}
+        return {
+            field_name: getattr(self, field_name)
+            for field_name in sorted(self.get_allowed_specs())
+        }
 
     def __str__(self) -> str:
         # e.g. BYBIT BTC_USDT_PERPETUAL (symbol=BTCUSDT, name=BYBIT_BTCUSDT)
@@ -149,6 +160,9 @@ class BaseProduct(BaseModel):
 
     def is_leveraged(self) -> bool:
         return self.product_type.is_leveraged()
+
+    def is_short(self) -> bool:
+        return self.product_type.is_short()
 
     # spot + asset class, same as the aliases STOCK, BOND etc., e.g. is_crypto_spot() is False for a crypto perpetual
     # NOTE: these are shortcuts for simple cases, for exposure instead, e.g. any crypto product, check product_type.asset_class directly
