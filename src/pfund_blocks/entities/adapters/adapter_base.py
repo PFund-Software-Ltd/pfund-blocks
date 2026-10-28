@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from typing import Any, ClassVar, Literal
+from typing import TYPE_CHECKING, Any, ClassVar, Literal
+
+if TYPE_CHECKING:
+    from pfund_blocks.entities.products.product_base import BaseProduct
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator
 
@@ -38,6 +41,10 @@ class BaseAdapter[GroupT: str = AdapterGroup](BaseModel):
         adapter.to_source(Side.BUY, group="side")  # -> "Buy", when sending to the source
         adapter.from_source("Buy", group="side")  # -> Side.BUY, when parsing the source's messages
         adapter.add_mapping(product.name, product.symbol, group="product")  # runtime mapping, both directions
+
+    Override create_symbol() and create_name() for the source's product conventions,
+    they are called by the product itself when it's validated with the adapter in the context, e.g.
+        Product.model_validate({...}, context={"adapter": adapter})
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(
@@ -102,20 +109,33 @@ class BaseAdapter[GroupT: str = AdapterGroup](BaseModel):
         if internal not in internals:
             internals.append(internal)
 
-    def to_source(self, internal: Any, *, group: GroupT) -> ExternalValue:
-        """Converts an internal value to the source's, e.g. to_source(Side.BUY, group="side") -> "Buy"."""
+    def to_source(self, internal: Any, *, group: GroupT, strict: bool = False) -> Any:
+        """Converts an internal value to the source's, e.g. to_source(Side.BUY, group="side") -> "Buy".
+
+        An unmapped value is returned as is, since most values are the same on the source, unless strict=True.
+        """
         mapping: dict[Any, ExternalValue] = getattr(self, group)
         if internal not in mapping:
-            raise KeyError(f"{internal!r} has no source mapping in group '{group}'")
+            if strict:
+                raise KeyError(f"{internal!r} has no source mapping in group '{group}'")
+            return internal
         return mapping[internal]
 
-    def from_source(self, external: ExternalValue, *, group: GroupT) -> Any:
-        """Converts a source's value to the internal one, e.g. from_source("Buy", group="side") -> Side.BUY."""
+    def from_source(
+        self, external: ExternalValue, *, group: GroupT, strict: bool = False
+    ) -> Any:
+        """Converts a source's value to the internal one, e.g. from_source("Buy", group="side") -> Side.BUY.
+
+        An unmapped value is returned as is, unless strict=True.
+        An ambiguous value always raises, since returning it as is would hide that it maps to several internal values.
+        """
         internals = self._from_source[group].get(external)
         if not internals:
-            raise KeyError(
-                f"source value {external!r} has no internal mapping in group '{group}'"
-            )
+            if strict:
+                raise KeyError(
+                    f"source value {external!r} has no internal mapping in group '{group}'"
+                )
+            return external
         if len(internals) > 1:
             raise KeyError(
                 f"source value {external!r} in group '{group}' is ambiguous, it maps to {internals}"
@@ -134,3 +154,19 @@ class BaseAdapter[GroupT: str = AdapterGroup](BaseModel):
             self._from_source[group][mapping[internal]].remove(internal)
         mapping[internal] = external
         self._index(group, internal, external)
+
+    # Override this method for the source's symbol conventions
+    def create_symbol(self, product: BaseProduct) -> str:
+        """Derives the source's symbol of a product, called by the product during validation.
+
+        Defaults to the product class's own convention, e.g. BTC_USDT_CRYPTO -> BTCUSDT.
+        """
+        return product._create_symbol()
+
+    # Override this method for the source's name conventions, e.g. when the source's symbols aren't unique
+    def create_name(self, product: BaseProduct) -> str:
+        """Derives the unique name of a product, called by the product during validation, after its symbol is set.
+
+        Defaults to the product class's own convention, i.e. source + symbol.
+        """
+        return product._create_name()

@@ -1,6 +1,16 @@
-from typing import Any, NamedTuple, Self
+from typing import TYPE_CHECKING, Any, NamedTuple, Self
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+if TYPE_CHECKING:
+    from pfund_blocks.entities.adapters.adapter_base import BaseAdapter
+
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 
 from pfund_blocks.entities.products.product_basis import ProductBasis
 from pfund_blocks.entities.products.product_type import ProductType
@@ -51,13 +61,21 @@ class BaseProduct(BaseModel):
         return value
 
     @model_validator(mode="after")
-    def _derive_symbol_and_name(self) -> Self:
+    def _derive_symbol_and_name(self, info: ValidationInfo) -> Self:
+        """Derives the symbol and name if not provided, with the source's conventions if an adapter is in the context.
+
+        e.g. Product.model_validate({...}, context={"adapter": adapter}), the adapter is not stored in the product.
+        """
+        adapter: BaseAdapter | None = (info.context or {}).get("adapter")
         # NOTE: object.__setattr__ is needed since the model is frozen,
         # it is safe here because the product is still being constructed
         if not self.symbol:
-            object.__setattr__(self, "symbol", self._create_symbol())
+            symbol = adapter.create_symbol(self) if adapter else self._create_symbol()
+            object.__setattr__(self, "symbol", symbol)
+        # after the symbol, since the name is usually derived from it
         if not self.name:
-            object.__setattr__(self, "name", self._create_name())
+            name = adapter.create_name(self) if adapter else self._create_name()
+            object.__setattr__(self, "name", name)
         return self
 
     # Override this method to customize the symbol creation logic

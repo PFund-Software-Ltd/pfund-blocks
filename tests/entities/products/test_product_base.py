@@ -3,6 +3,8 @@ from __future__ import annotations
 import pydantic
 import pytest
 
+from pfund_blocks.entities.adapters.adapter_base import BaseAdapter
+from pfund_blocks.entities.products.future import PerpetualProduct
 from pfund_blocks.entities.products.product_base import BaseProduct, ProductKey
 from pfund_blocks.entities.products.product_basis import ProductBasis
 from pfund_blocks.entities.products.product_type import ProductType
@@ -75,6 +77,82 @@ class TestSymbolAndName:
         product = create()
         with pytest.raises(pydantic.ValidationError, match="frozen"):
             product.symbol = "ETHUSDT"  # ty: ignore[invalid-assignment]
+
+
+class DashAdapter(BaseAdapter):
+    """A source that joins assets with "-" and names products by basis."""
+
+    def create_symbol(self, product: BaseProduct) -> str:
+        return f"{product.base_asset}-{product.quote_asset}"
+
+    def create_name(self, product: BaseProduct) -> str:
+        return f"{product.source}_{product.basis}"
+
+
+def create_with_adapter(
+    adapter: BaseAdapter, basis: str = "BTC_USDT_PERP", **kwargs: object
+) -> DerivedSymbolProduct:
+    return DerivedSymbolProduct.model_validate(
+        {"source": "BYBIT", "basis": basis, **kwargs}, context={"adapter": adapter}
+    )
+
+
+class TestAdapterContext:
+    def test_adapter_derives_symbol_and_name(self):
+        product = create_with_adapter(DashAdapter())
+        assert product.symbol == "BTC-USDT"
+        assert product.name == "BYBIT_BTC_USDT_PERPETUAL"
+
+    def test_name_is_derived_after_the_symbol(self):
+        # BaseAdapter's create_name() defaults to the product's, which reads the adapter's symbol
+        class SymbolOnlyAdapter(BaseAdapter):
+            def create_symbol(self, product: BaseProduct) -> str:
+                return "XBTUSDT"
+
+        product = create_with_adapter(SymbolOnlyAdapter())
+        assert product.name == "BYBIT_XBTUSDT"
+
+    def test_default_adapter_follows_the_product_conventions(self):
+        assert create_with_adapter(BaseAdapter()) == create()
+        assert create_with_adapter(BaseAdapter()).symbol == "BTCUSDT"
+
+    def test_explicit_symbol_and_name_skip_the_adapter(self):
+        product = create_with_adapter(DashAdapter(), symbol="BTCUSDT", name="BTC")
+        assert product.symbol == "BTCUSDT"
+        assert product.name == "BTC"
+
+    def test_no_context_or_no_adapter_uses_the_product_conventions(self):
+        assert create().symbol == "BTCUSDT"
+        product = DerivedSymbolProduct.model_validate(
+            {"source": "BYBIT", "basis": "BTC_USDT_PERP"}, context={}
+        )
+        assert product.symbol == "BTCUSDT"
+
+    def test_adapter_is_not_stored(self):
+        product = create_with_adapter(DashAdapter())
+        assert "adapter" not in product.model_dump()
+        assert not hasattr(product, "adapter")
+
+    def test_adapter_does_not_affect_equality(self):
+        # same fields, the adapter it was validated with plays no part
+        with_adapter = create_with_adapter(
+            DashAdapter(), symbol="BTCUSDT", name="BYBIT_BTCUSDT"
+        )
+        assert with_adapter == create()
+        assert hash(with_adapter) == hash(create())
+
+    def test_nested_underlying_dict_gets_the_adapter_too(self):
+        product = PerpetualProduct.model_validate(
+            {
+                "source": "BYBIT",
+                "basis": "BTC_USDT_PERP",
+                "underlying": {"source": "BYBIT", "basis": "BTC_USDT_CRYPTO"},
+            },
+            context={"adapter": DashAdapter()},
+        )
+        assert product.symbol == "BTC-USDT"
+        assert product.underlying is not None
+        assert product.underlying.symbol == "BTC-USDT"
 
 
 class TestBasis:

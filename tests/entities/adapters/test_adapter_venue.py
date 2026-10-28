@@ -21,7 +21,7 @@ class TestTradingGroups:
         with pytest.raises(
             KeyError, match="has no source mapping in group 'order_type'"
         ):
-            adapter.to_source(OrderType.STOP_MARKET, group="order_type")
+            adapter.to_source(OrderType.STOP_MARKET, group="order_type", strict=True)
 
     def test_order_status_maps_the_repr(self):
         adapter = VenueAdapter(order_status={"CF--": "Filled"})
@@ -58,7 +58,7 @@ class TestTimeInForceDefault:
         adapter = VenueAdapter(time_in_force={TimeInForce.GTC: "Gtc"})
         assert adapter.to_source(TimeInForce.GTC, group="time_in_force") == "Gtc"
         with pytest.raises(KeyError):
-            adapter.to_source(TimeInForce.FOK, group="time_in_force")
+            adapter.to_source(TimeInForce.FOK, group="time_in_force", strict=True)
 
     def test_add_mapping_does_not_leak_into_the_default(self):
         adapter = VenueAdapter()
