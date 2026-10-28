@@ -1,4 +1,10 @@
 from pfund_blocks.enums.asset import AssetClass, AssetModifier, AssetType
+from pfund_blocks.enums.channel import (
+    Channel,
+    ChannelType,
+    PrivateChannel,
+    PublicChannel,
+)
 from pfund_blocks.enums.env import Environment
 from pfund_blocks.enums.margin_mode import MarginMode
 from pfund_blocks.enums.month_code import CryptoMonthCode, FutureMonthCode
@@ -13,6 +19,8 @@ __all__ = [
     "AssetClass",
     "AssetModifier",
     "AssetType",
+    "Channel",
+    "ChannelType",
     "CryptoMonthCode",
     "Environment",
     "FutureMonthCode",
@@ -20,6 +28,8 @@ __all__ = [
     "OptionType",
     "OrderType",
     "PositionMode",
+    "PrivateChannel",
+    "PublicChannel",
     "Side",
     "TimeInForce",
     "Timeframe",
