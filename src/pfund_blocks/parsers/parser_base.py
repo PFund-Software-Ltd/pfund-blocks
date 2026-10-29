@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING, Any, ClassVar
 if TYPE_CHECKING:
     from pfund_blocks.adapters.adapter_base import BaseAdapter
 
+from pfund_blocks.parsers.schema import parse_schema
+
 
 class BaseParser:
     """Parses a venue's responses into standardized data, shared by its REST and WS APIs.
@@ -23,6 +25,8 @@ class BaseParser:
     adapter: ClassVar[BaseAdapter[Any]]  # maps the venue's values to pfund's, e.g. adapter = BybitAdapter()
     rest_api: ClassVar[dict[str, str]] = {}  # REST API function name -> parsing method name
     ws_api: ClassVar[dict[str, str]] = {}  # WS API function name -> parsing method name
+
+    parse_schema = staticmethod(parse_schema)  # converts a response into standardized data by a schema
 
     def _parse(self, table: dict[str, str], name: str, response: Any) -> Any:
         """Parses the response with the parsing method mapped to `name` in `table`.

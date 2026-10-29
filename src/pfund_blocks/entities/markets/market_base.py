@@ -1,7 +1,9 @@
-from decimal import Decimal
 from datetime import datetime, timedelta
+from decimal import Decimal
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+
+from pfund_blocks.entities.products.product_type import ProductType
 
 
 class BaseMarket(BaseModel):
@@ -10,7 +12,7 @@ class BaseMarket(BaseModel):
     symbol: str
     base_asset: str
     quote_asset: str
-    asset_type: str
+    product_type: ProductType
     tick_size: Decimal | None = Field(
         default=None, description="Tick size, minimum price increment"
     )
@@ -34,7 +36,7 @@ class BaseMarket(BaseModel):
         default=None, description="Date the market was listed"
     )
     expiration: datetime | None = Field(default=None, description="expiration date")
-    settle_currency: str | None = Field(default=None, description="Settlement currency")
+    settlement_currency: str | None = Field(default=None, description="Settlement currency")
     funding_interval: timedelta | None = Field(
         default=None, description="Funding interval"
     )
