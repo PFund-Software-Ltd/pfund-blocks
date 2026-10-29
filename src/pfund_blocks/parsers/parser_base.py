@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 if TYPE_CHECKING:
     from pfund_blocks.adapters.adapter_base import BaseAdapter
 
-from pfund_blocks.parsers.schema import parse_schema
+from pfund_blocks.parsers.dsl import parse_schema
 
 
 class BaseParser:
@@ -26,7 +26,7 @@ class BaseParser:
     rest_api: ClassVar[dict[str, str]] = {}  # REST API function name -> parsing method name
     ws_api: ClassVar[dict[str, str]] = {}  # WS API function name -> parsing method name
 
-    parse_schema = staticmethod(parse_schema)  # converts a response into standardized data by a schema
+    parse_schema = staticmethod(parse_schema)  # helper for parsing methods to convert a response by a DSL schema, see parsers/dsl.py
 
     def _parse(self, table: dict[str, str], name: str, response: Any) -> Any:
         """Parses the response with the parsing method mapped to `name` in `table`.

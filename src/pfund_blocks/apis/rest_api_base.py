@@ -1,6 +1,14 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, ClassVar, Literal, Protocol, TypedDict, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ClassVar,
+    Literal,
+    NamedTuple,
+    Protocol,
+    TypedDict,
+)
 
 if TYPE_CHECKING:
     from httpx2 import Response
@@ -17,6 +25,11 @@ from json import JSONDecodeError
 from httpx2 import AsyncClient, HTTPStatusError, RequestError
 
 from pfund_blocks.enums.env import Environment
+
+
+class Endpoint(NamedTuple):
+    method: HTTPMethod
+    path: str  # path after the base url, e.g. "/v5/market/instruments-info"
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,10 +90,18 @@ class RestResult(TypedDict):
 
 class BaseRestAPI(ABC):
     venue: ClassVar[str]  # upper case, consistent with BaseAccount.venue, e.g. "BYBIT"
-    URLS: ClassVar[dict[Literal[Environment.PAPER, Environment.LIVE], str]]
-    VERSION: ClassVar[str | None] = None  # e.g. "v5" for Bybit, None if the venue's API is not versioned
+    urls: ClassVar[dict[Literal[Environment.PAPER, Environment.LIVE], str]]
+    version: ClassVar[str | None] = None  # e.g. "v5" for Bybit, None if the venue's API is not versioned
     signer: ClassVar[RestSigner[Any] | None] = None  # None if the venue has no private endpoints
     parser: ClassVar[BaseParser | None] = None  # None if responses are not parsed, i.e. data is always None
+    # NOTE: endpoint names should match the function names, e.g. "get_markets" for get_markets()
+    public_endpoints: ClassVar[dict[str, Endpoint]] = {}
+    private_endpoints: ClassVar[dict[str, Endpoint]] = {}
+
+    def __init_subclass__(cls, **kwargs: Any):
+        super().__init_subclass__(**kwargs)
+        if duplicates := cls.public_endpoints.keys() & cls.private_endpoints.keys():
+            raise ValueError(f"{cls.__name__} has endpoints in both public_endpoints and private_endpoints: {sorted(duplicates)}")
 
     def __init__(self, env: Literal[Environment.PAPER, Environment.LIVE, "PAPER", "LIVE"]):
         """
@@ -89,7 +110,7 @@ class BaseRestAPI(ABC):
         """
         self._env = self._validate_env(env)
         self._logger = logging.getLogger(f"pfund.{self.venue.lower()}")
-        self._url: str = self.URLS[self._env]
+        self._url: str = self.urls[self._env]
         self._client = AsyncClient()
 
     @staticmethod
@@ -102,6 +123,29 @@ class BaseRestAPI(ABC):
     @property
     def env(self) -> Literal[Environment.PAPER, Environment.LIVE]:
         return self._env
+
+    def get_endpoint(self, name: str) -> Endpoint:
+        if name in self.public_endpoints:
+            return self.public_endpoints[name]
+        if name in self.private_endpoints:
+            return self.private_endpoints[name]
+        raise ValueError(
+            f'"{name}" is not a registered endpoint, it must match a key in public_endpoints or private_endpoints'
+        )
+
+    def _create_request(
+        self, name: str, *, params: dict[str, Any] | None = None, body: dict[str, Any] | None = None
+    ) -> RestRequest:
+        """Creates the request of the registered endpoint `name`, private if it is in private_endpoints."""
+        endpoint = self.get_endpoint(name)
+        return RestRequest(
+            name=name,
+            method=endpoint.method,
+            path=endpoint.path,
+            params=params,
+            body=body,
+            private=name in self.private_endpoints,
+        )
 
     @abstractmethod
     def _is_success(self, request: RestRequest, response: Any) -> bool:

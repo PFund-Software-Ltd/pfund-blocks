@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from pfund_blocks.parsers.parser_base import BaseParser
-from pfund_blocks.parsers.schema import SchemaParseError, parse_schema
+from pfund_blocks.parsers.dsl import SchemaParseError, parse_schema
 
 
 class TestHardcodedValue:
