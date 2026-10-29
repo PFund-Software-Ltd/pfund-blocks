@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
 if TYPE_CHECKING:
-    from pfund_blocks.entities.adapters.adapter_venue import VenueAdapter
+    from pfund_blocks.adapters.adapter_venue import VenueAdapter
     from pfund_blocks.entities.products.product_base import BaseProduct
     from pfund_blocks.entities.products.product_basis import ProductBasis
 

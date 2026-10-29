@@ -23,9 +23,11 @@ depends-on = [
 [dependencies]
 
 [pypi-dependencies]
+python-dotenv = ">=1.2.4"
+httpx2 = { version = ">=2.16.0", extras = ["http2"] }
+websockets = ">=16.1.1"
 msgspec = ">=0.22.0"
 pydantic = ">=2.14.1"
-python-dotenv = ">=1.2.4"
 
 [environments]
 default = ["py313", "dev", "test"]

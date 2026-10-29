@@ -6,6 +6,3 @@ class Environment(StrEnum):
     SANDBOX = "SANDBOX"
     PAPER = "PAPER"
     LIVE = "LIVE"
-
-    def is_simulated(self):
-        return self in [Environment.BACKTEST, Environment.SANDBOX]

@@ -16,8 +16,8 @@ class _AccountMeta(ABCMeta):
     ) -> AccountT:
         # run the checks after the whole __init__ chain, when subclasses have set their credentials
         account = super().__call__(*args, **kwargs)
-        if account.env.is_simulated():
-            account._assert_no_credential_leak_in_simulated_env()
+        if account.env in (Environment.BACKTEST, Environment.SANDBOX):
+            account._assert_no_credential_leak_in_backtest_or_sandbox_env()
         else:
             account._assert_credentials_provided_in_paper_or_live_trading_env()
         # only needed while constructing, don't carry the whole .env file around (e.g. when pickled to Ray workers)
@@ -53,7 +53,7 @@ class BaseAccount(ABC, metaclass=_AccountMeta):
         )
 
     @abstractmethod
-    def _assert_no_credential_leak_in_simulated_env(self) -> None: ...
+    def _assert_no_credential_leak_in_backtest_or_sandbox_env(self) -> None: ...
 
     @abstractmethod
     def _assert_credentials_provided_in_paper_or_live_trading_env(self) -> None: ...

@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import Field
 
-from pfund_blocks.entities.adapters.adapter_base import (
+from pfund_blocks.adapters.adapter_base import (
     AdapterGroup,
     BaseAdapter,
     ExternalValue,

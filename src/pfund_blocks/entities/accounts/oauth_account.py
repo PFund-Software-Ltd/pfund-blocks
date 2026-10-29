@@ -24,7 +24,7 @@ class OAuthAccount(BaseAccount):
         super().__init__(env=env, venue=venue, name=name)
         self._token: str = token or (self._dotenv.get(f"{self.venue}_ACCESS_TOKEN", "") or "")
 
-    def _assert_no_credential_leak_in_simulated_env(self):
+    def _assert_no_credential_leak_in_backtest_or_sandbox_env(self):
         if self._token:
             raise ValueError(
                 f"{self.venue} ACCESS TOKEN should NOT be provided for {self._env} environment, \n"

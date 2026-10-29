@@ -3,7 +3,7 @@ from __future__ import annotations
 import pydantic
 import pytest
 
-from pfund_blocks.entities.adapters.adapter_base import BaseAdapter
+from pfund_blocks.adapters.adapter_base import BaseAdapter
 from pfund_blocks.entities.products.future import FutureProduct
 from pfund_blocks.entities.products.product_type import ProductType
 from pfund_blocks.entities.products.spot import CryptoProduct

@@ -3,8 +3,8 @@ from __future__ import annotations
 import pydantic
 import pytest
 
-from pfund_blocks.entities.adapters.adapter_base import BaseAdapter
-from pfund_blocks.entities.adapters.adapter_venue import VenueAdapter
+from pfund_blocks.adapters.adapter_base import BaseAdapter
+from pfund_blocks.adapters.adapter_venue import VenueAdapter
 from pfund_blocks.enums import Channel, MarginMode, OrderType, Side, TimeInForce
 
 

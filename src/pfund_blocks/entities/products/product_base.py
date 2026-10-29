@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, Any, NamedTuple, Self
 
 if TYPE_CHECKING:
-    from pfund_blocks.entities.adapters.adapter_base import BaseAdapter
+    from pfund_blocks.adapters.adapter_base import BaseAdapter
 
 from pydantic import (
     BaseModel,

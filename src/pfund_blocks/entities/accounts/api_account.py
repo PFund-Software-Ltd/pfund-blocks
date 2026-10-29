@@ -27,7 +27,7 @@ class APIKeyAccount(BaseAccount):
                 + "or by strategy.add_account(..., key=..., secret=...)"
             )
 
-    def _assert_no_credential_leak_in_simulated_env(self):
+    def _assert_no_credential_leak_in_backtest_or_sandbox_env(self):
         if self._key or self._secret:
             raise ValueError(
                 f"{self.venue} API KEY and SECRET should NOT be provided for {self._env} environment, \n"
