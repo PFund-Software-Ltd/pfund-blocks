@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from typing import ClassVar
 
 from http import HTTPMethod
 
 import pytest
 
-from pfund_blocks.apis.rest_api_base import BaseRestAPI, Endpoint, RestRequest
+from pfund_blocks.apis.rest_api_base import BaseRestAPI
 from pfund_blocks.enums.env import Environment
+from pfund_blocks.typing import Endpoint, Request
 
 
 class DummyRestAPI(BaseRestAPI):
@@ -15,12 +16,6 @@ class DummyRestAPI(BaseRestAPI):
     urls = {Environment.PAPER: "https://paper.dummy", Environment.LIVE: "https://live.dummy"}  # noqa: RUF012
     public_endpoints = {"get_markets": Endpoint(HTTPMethod.GET, "/markets")}  # noqa: RUF012
     private_endpoints = {"place_order": Endpoint(HTTPMethod.POST, "/order")}  # noqa: RUF012
-
-    def _is_success(self, request: RestRequest, response: Any) -> bool:
-        return True
-
-    def _extract_error(self, request: RestRequest, response: Any) -> str:
-        return ""
 
 
 @pytest.fixture
@@ -42,12 +37,12 @@ class TestGetEndpoint:
 
 class TestCreateRequest:
     def test_public(self, api: DummyRestAPI):
-        assert api._create_request("get_markets", params={"category": "spot"}) == RestRequest(
+        assert api._create_request("get_markets", params={"category": "spot"}) == Request(
             name="get_markets", method=HTTPMethod.GET, path="/markets", params={"category": "spot"}, private=False
         )
 
     def test_private(self, api: DummyRestAPI):
-        assert api._create_request("place_order", body={"qty": "1"}) == RestRequest(
+        assert api._create_request("place_order", body={"qty": "1"}) == Request(
             name="place_order", method=HTTPMethod.POST, path="/order", body={"qty": "1"}, private=True
         )
 
