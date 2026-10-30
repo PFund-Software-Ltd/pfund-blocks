@@ -211,6 +211,15 @@ class BaseWebSocketAPI(ABC):
         """
         ...
 
+    async def _dispatch_message(self, message: Message) -> None:
+        """Passes the message to the callback.
+        Override it to e.g. unwrap a venue's message of many products into one message per product.
+        """
+        if self._callback is None:
+            return
+        if inspect.isawaitable(ret := self._callback(message)):
+            await ret
+
     async def _send(self, ws: WebSocket, msg: dict[str, Any]) -> None:
         await ws.send(json.encode(msg), text=True)
         self._logger.debug(f"{ws.name} sent {msg}")
@@ -321,8 +330,7 @@ class BaseWebSocketAPI(ABC):
                             "data": data,
                             "error": error,
                         }
-                        if inspect.isawaitable(ret := self._callback(message)):
-                            await ret
+                        await self._dispatch_message(message)
                     except Exception:
                         # one bad message shouldn't kill the stream
                         self._logger.exception(f"{ws_name} failed to handle message {raw_msg!r}")
