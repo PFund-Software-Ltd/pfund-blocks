@@ -98,18 +98,16 @@ class TestParsing:
         with pytest.raises(ValueError, match="only quotes have orderbook levels"):
             Resolution(value)
 
-    @pytest.mark.parametrize(
-        "value, period", [("2q", 2), ("5q_L1", 5), ("10quote", 10)]
-    )
-    def test_l1_quote_supports_period(self, value: str, period: int):
-        resolution = Resolution(value)
-        assert resolution.is_quote_l1()
-        assert resolution.period == period
-
-    @pytest.mark.parametrize("value", ["2q_L2", "5q_L3", "10quote_L2"])
-    def test_l2_l3_quote_rejects_period(self, value: str):
-        with pytest.raises(ValueError, match="only L1 quotes support period > 1"):
+    @pytest.mark.parametrize("value", ["2q", "5q_L1", "10quote"])
+    def test_l1_quote_rejects_period(self, value: str):
+        with pytest.raises(ValueError, match="only period 1 is supported"):
             Resolution(value)
+
+    @pytest.mark.parametrize(
+        "value, depth", [("10q_L2", 10), ("50quote_L2", 50), ("5q_L3", 5)]
+    )
+    def test_l2_l3_quote_period_is_depth(self, value: str, depth: int):
+        assert Resolution(value).period == depth
 
     def test_default_orderbook_level(self):
         assert Resolution("1q").orderbook_level == Resolution.DEFAULT_ORDERBOOK_LEVEL
@@ -264,10 +262,14 @@ class TestOrdering:
     def test_period_within_unit(self):
         assert Resolution("1m") > Resolution("5m")
         assert Resolution("2t") < Resolution("1t")
-        assert Resolution("1q") > Resolution("2q")
 
-    def test_quote_with_period_still_finer_than_tick(self):
-        assert Resolution("2q") > Resolution("1t")
+    def test_quote_finer_than_tick(self):
+        assert Resolution("1q") > Resolution("1t")
+
+    def test_deeper_quote_is_finer(self):
+        assert Resolution("50q_L2") > Resolution("10q_L2")
+        # level before depth, e.g. any L2 is finer than L1
+        assert Resolution("1q_L3") > Resolution("500q_L2") > Resolution("1q_L1")
 
     def test_compares_by_duration_across_units(self):
         assert Resolution("120m") < Resolution("1h")
@@ -503,16 +505,16 @@ class TestImmutability:
         assert not hasattr(Resolution("1m"), "__dict__")
 
     def test_copy_constructor_copies_all_slots(self):
-        original = Resolution("2q")
+        original = Resolution("1q_L2")
         copied = Resolution(original)
         assert copied is not original
         assert (copied.period, copied.timeframe, copied.orderbook_level) == (
-            2,
-            Timeframe.QUOTE,
             1,
+            Timeframe.QUOTE,
+            2,
         )
 
-    @pytest.mark.parametrize("value", ["1m", "5h", "2q", "1q_L3", "10t", "1mo"])
+    @pytest.mark.parametrize("value", ["1m", "5h", "1q_L1", "1q_L3", "10t", "1mo"])
     def test_pickle_round_trip(self, value: str):
         resolution = Resolution(value)
         restored = pickle.loads(pickle.dumps(resolution))

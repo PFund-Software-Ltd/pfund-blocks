@@ -119,11 +119,11 @@ class Resolution:
                 resolved_orderbook_level = int(orderbook_level.upper().lstrip("L"))
             else:
                 resolved_orderbook_level = self.DEFAULT_ORDERBOOK_LEVEL
-            # L1 quotes are self-contained snapshots and can be stacked,
-            # L2/L3 are orderbook deltas that must be applied one by one, so period must be 1
-            if resolved_orderbook_level > 1 and self.period != 1:
+            # for quotes, period = orderbook depth per side, e.g. 10q_L2 = 10 levels of bids and asks
+            # L1 is the top of the book, so its period must be 1
+            if resolved_orderbook_level == 1 and self.period != 1:
                 raise ValueError(
-                    f"Invalid period {self.period} for L{resolved_orderbook_level} quotes, only L1 quotes support period > 1"
+                    f"Invalid period {self.period} for L1 quotes, L1 is the top of the book, only period 1 is supported"
                 )
         elif orderbook_level:
             raise ValueError(
@@ -142,10 +142,13 @@ class Resolution:
         """Higher tuple = higher resolution.
         Time-based resolutions compare by negated total seconds (so 1h == 60m, 120m < 1h),
         quote and tick (negative timeframe values, negated to 2 and 1) rank above all of them,
-        then compare by unit, then smaller period, then deeper orderbook level.
+        then compare by unit, then ticks by smaller period,
+        quotes by deeper orderbook level, then by deeper orderbook depth (= period), e.g. 50q_L2 > 10q_L2.
         """
-        if self.is_quote() or self.is_tick():
-            return (-self.timeframe.value, -self.period, self.orderbook_level or 1)
+        if self.is_quote():
+            return (-self.timeframe.value, self.orderbook_level or 1, self.period)
+        if self.is_tick():
+            return (-self.timeframe.value, -self.period, 1)
         return (-(self.period * self.timeframe.value), 0, 1)
 
     def is_quote_l1(self) -> bool:

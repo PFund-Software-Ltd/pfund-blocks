@@ -75,6 +75,9 @@ class DummyWebSocketAPI(BaseWebSocketAPI):
     ) -> FullChannel:
         return f"{resolution!r}.{product.symbol}"
 
+    def get_supported_resolutions(self, product: BaseProduct) -> list[Resolution]:
+        return [Resolution("1m"), Resolution("1t"), Resolution("1q")]
+
     async def subscribe(
         self, ws: WebSocket, channels: list[FullChannel], channel_type: ChannelType
     ) -> None:
@@ -181,6 +184,11 @@ class TestCreateMarketDataChannel:
         product = create_product()
         api.create_market_data_channel(product, Resolution("1m"))
         assert api._products == {product.name: product}
+
+    def test_unsupported_resolution_raises(self, api: DummyWebSocketAPI):
+        with pytest.raises(ValueError, match="is not supported, supported resolutions"):
+            api.create_market_data_channel(create_product(), Resolution("5m"))
+        assert api._products == {}
 
 
 class TestCreatePrivateChannels:

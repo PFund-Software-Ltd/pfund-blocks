@@ -103,6 +103,12 @@ class BaseWebSocketAPI(ABC):
 
     def create_market_data_channel(self, product: BaseProduct, resolution: Resolution) -> FullChannel:
         """Creates the venue's market data channel of the product, e.g. "kline.1.BTCUSDT" for Bybit's 1m bars."""
+        supported_resolutions = self.get_supported_resolutions(product)
+        if resolution not in supported_resolutions:
+            raise ValueError(
+                f"{self.venue} {product.name} {resolution=} is not supported, " +
+                f"supported resolutions: {[repr(r) for r in supported_resolutions]}"
+            )
         full_channel = self._create_market_data_channel(product, resolution)
         self.add_product(product)
         if resolution.is_quote():
@@ -116,6 +122,13 @@ class BaseWebSocketAPI(ABC):
 
     @abstractmethod
     def _create_market_data_channel(self, product: BaseProduct, resolution: Resolution) -> FullChannel: ...
+
+    @abstractmethod
+    def get_supported_resolutions(self, product: BaseProduct) -> list[Resolution]:
+        """Returns the resolutions the venue streams for the product, checked in create_market_data_channel(),
+        e.g. Bybit's depend on the product's category.
+        """
+        ...
 
     def create_private_channels(self) -> list[FullChannel]:
         """Creates the venue's channels for private data (balances, positions, orders, trades),
