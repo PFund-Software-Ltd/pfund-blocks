@@ -67,6 +67,7 @@ class BaseWebSocketAPI[AccountT: BaseAccount = BaseAccount](ABC):
 
         self._websockets: dict[WebSocketName, WebSocket] = {}
         self._is_running = False
+        self._connect_task: asyncio.Task[None] | None = None
         self._callback: Callable[[Message], Awaitable[None] | None] | None = None
         self._include_raw_message = True
 
@@ -260,11 +261,13 @@ class BaseWebSocketAPI[AccountT: BaseAccount = BaseAccount](ABC):
         self._websockets[ws_name] = ws
 
     async def connect(self) -> None:
-        """Connects all websockets and runs until disconnect() is called.
+        """Starts connecting all websockets in the background and returns right away, before they are connected.
         One websocket for public channels, one per account for private channels.
 
-        Raises if any websocket fails, the others are then cancelled.
+        They keep running until disconnect() is called or a websocket fails, see wait_until_disconnected().
         """
+        if self._is_running:
+            raise RuntimeError(f"{self.venue} websocket API is already running")
         public_channels = self._channels[ChannelType.public]
         private_channels = self._channels[ChannelType.private]
         if private_channels and not self._accounts:
@@ -275,6 +278,26 @@ class BaseWebSocketAPI[AccountT: BaseAccount = BaseAccount](ABC):
             self._logger.warning("no callback set, data messages will be dropped")
         # set before any websocket starts, so that even a drop during startup is reconnected
         self._is_running = True
+        self._connect_task = asyncio.create_task(self._run_websockets())
+
+    async def wait_until_disconnected(self) -> None:
+        """Waits until the websockets started by connect() have stopped, returns right away if never connected.
+
+        Raises if any websocket failed, the others are then cancelled.
+        Cancelling this wait doesn't disconnect the websockets.
+        """
+        task = self._connect_task
+        if task is None:
+            return
+        # NOTE: not `await task`, cancelling that would also cancel the task
+        await asyncio.wait({task})
+        # disconnect() cancels the task, that is not a failure
+        if not task.cancelled():
+            task.result()
+
+    async def _run_websockets(self) -> None:
+        public_channels = self._channels[ChannelType.public]
+        private_channels = self._channels[ChannelType.private]
         try:
             async with asyncio.TaskGroup() as tg:
                 if public_channels:
@@ -346,8 +369,12 @@ class BaseWebSocketAPI[AccountT: BaseAccount = BaseAccount](ABC):
         self._logger.warning(f"{ws_name} is disconnected")
 
     async def disconnect(self, reason: str = "") -> None:
-        """Closes all websockets, which ends their message loops so that connect() returns."""
+        """Closes all websockets and waits until they have stopped."""
         self._is_running = False
         for ws_name, ws in list(self._websockets.items()):
             self._logger.info(f"{ws_name} is disconnecting, {reason=}")
             await ws.close(code=1000, reason=reason)
+        if self._connect_task is not None:
+            # NOTE: a websocket retrying during an outage has nothing to close, only cancelling stops it
+            self._connect_task.cancel()
+            await asyncio.wait({self._connect_task})

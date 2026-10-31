@@ -10,11 +10,14 @@ if TYPE_CHECKING:
     from pfund_blocks.typing import DecodedMessage, FullChannel, Message, RawMessage
 
 import asyncio
+import http
+import socket
 
 import pytest
 import websockets
 from msgspec import json
 from websockets.asyncio.server import ServerConnection
+from websockets.exceptions import InvalidStatus
 
 from pfund_blocks.adapters.adapter_base import BaseAdapter
 from pfund_blocks.apis.ws_api_base import BaseWebSocketAPI, WebSocket
@@ -299,7 +302,7 @@ async def run(
     async with websockets.serve(server.handler, "localhost", 0) as ws_server:
         port = ws_server.sockets[0].getsockname()[1]
         api.url = f"ws://localhost:{port}"
-        task = asyncio.create_task(api.connect())
+        await api.connect()
         async with asyncio.timeout(5):
             while not server.connections:
                 await asyncio.sleep(0.01)
@@ -308,7 +311,7 @@ async def run(
             while not until():
                 await asyncio.sleep(0.01)
         await api.disconnect()
-        await task
+        await api.wait_until_disconnected()
 
 
 def connected_api(**callback_kwargs: Any) -> tuple[DummyWebSocketAPI, list[Message]]:
@@ -429,6 +432,129 @@ class TestReconnect:
 
         asyncio.run(run(api, server, until=lambda: len(received) == 2, during=close))
         assert len(server.connections) == 2
+
+
+def get_unused_port() -> int:
+    with socket.socket() as sock:
+        sock.bind(("localhost", 0))
+        return sock.getsockname()[1]
+
+
+class TestConnectLifecycle:
+    def test_connect_returns_before_connected(self):
+        async def main() -> None:
+            api, _ = connected_api()
+            server = Server([])
+            async with websockets.serve(server.handler, "localhost", 0) as ws_server:
+                api.url = f"ws://localhost:{ws_server.sockets[0].getsockname()[1]}"
+                await api.connect()
+                assert server.connections == []
+                await api.disconnect()
+
+        asyncio.run(main())
+
+    def test_connect_while_running_raises(self):
+        async def main() -> None:
+            api, _ = connected_api()
+            api.url = f"ws://localhost:{get_unused_port()}"
+            await api.connect()
+            with pytest.raises(RuntimeError, match="already running"):
+                await api.connect()
+            await api.disconnect()
+
+        asyncio.run(main())
+
+    def test_connect_again_after_disconnect(self):
+        api, received = connected_api()
+
+        async def main() -> None:
+            await run(api, Server([kline(1)]), until=lambda: len(received) == 1)
+            await run(api, Server([kline(2)]), until=lambda: len(received) == 2)
+
+        asyncio.run(main())
+
+    def test_wait_without_connect_returns(self):
+        api, _ = connected_api()
+        asyncio.run(asyncio.wait_for(api.wait_until_disconnected(), timeout=1))
+
+    def test_wait_ends_on_disconnect(self):
+        async def main() -> None:
+            api, _ = connected_api()
+            api.url = f"ws://localhost:{get_unused_port()}"
+            await api.connect()
+            wait = asyncio.create_task(api.wait_until_disconnected())
+            await asyncio.sleep(0.01)
+            await api.disconnect()
+            await asyncio.wait_for(wait, timeout=1)
+
+        asyncio.run(main())
+
+    def test_cancelling_wait_keeps_the_connection(self):
+        async def main() -> None:
+            api, received = connected_api()
+            server = Server([kline(1)])
+            async with websockets.serve(server.handler, "localhost", 0) as ws_server:
+                api.url = f"ws://localhost:{ws_server.sockets[0].getsockname()[1]}"
+                await api.connect()
+                with pytest.raises(TimeoutError):
+                    await asyncio.wait_for(api.wait_until_disconnected(), timeout=0.01)
+                assert api._is_running is True
+                async with asyncio.timeout(5):
+                    while not received:
+                        await asyncio.sleep(0.01)
+                await api.disconnect()
+
+        asyncio.run(main())
+
+    def test_fatal_error_raises_in_wait(self):
+        async def reject(conn: ServerConnection, request: Any) -> Any:
+            return conn.respond(http.HTTPStatus.UNAUTHORIZED, "unauthorized")
+
+        async def main() -> None:
+            api, _ = connected_api()
+            async with websockets.serve(Server([]).handler, "localhost", 0, process_request=reject) as ws_server:
+                api.url = f"ws://localhost:{ws_server.sockets[0].getsockname()[1]}"
+                await api.connect()  # doesn't raise, the error is only known once connecting has failed
+                with pytest.raises(ExceptionGroup) as exc_info:
+                    await asyncio.wait_for(api.wait_until_disconnected(), timeout=5)
+                assert exc_info.group_contains(InvalidStatus)
+                assert api._is_running is False
+
+        asyncio.run(main())
+
+    def test_disconnect_during_outage_does_not_wait_for_retries(self):
+        async def main() -> None:
+            api, _ = connected_api()
+            api.url = f"ws://localhost:{get_unused_port()}"  # nothing is listening
+            await api.connect()
+            await asyncio.sleep(0.05)
+            await asyncio.wait_for(api.disconnect(), timeout=1)
+            assert api._connect_task is not None
+            assert api._connect_task.done()
+
+        asyncio.run(main())
+
+    def test_disconnect_from_callback(self):
+        async def main() -> None:
+            api = DummyWebSocketAPI()
+            api.add_channel(api.create_market_data_channel(create_product(), Resolution("1m")), channel_type="public")
+            received: list[Message] = []
+
+            async def callback(message: Message) -> None:
+                received.append(message)
+                await api.disconnect()
+
+            api.set_callback(callback)
+            server = Server([kline(1), kline(2)])
+            async with websockets.serve(server.handler, "localhost", 0) as ws_server:
+                api.url = f"ws://localhost:{ws_server.sockets[0].getsockname()[1]}"
+                await api.connect()
+                await asyncio.wait_for(api.wait_until_disconnected(), timeout=5)
+            assert len(received) == 1
+            assert api._websockets == {}
+            assert api._is_running is False
+
+        asyncio.run(main())
 
 
 class PingWebSocketAPI(DummyWebSocketAPI):
