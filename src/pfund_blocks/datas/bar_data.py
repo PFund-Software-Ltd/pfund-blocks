@@ -144,7 +144,8 @@ class BarData(MarketData):
         """
         if not isinstance(resampler, (TickData, BarData)):
             raise TypeError(f"resampler must be TickData or BarData, got {type(resampler).__name__}")
-        if isinstance(resampler, BarData):
+        # NOTE: a resampler that isn't finer is rejected by MarketData.bind_resampler()
+        if isinstance(resampler, BarData) and resampler.resolution > self.resolution:
             # any window of this data and the resampler's bar it starts in, the same holds for all the other windows
             start_ts, end_ts = get_bar_window(0, self.resolution, self.shift)
             resampler_start_ts, resampler_end_ts = get_bar_window(start_ts, resampler.resolution, resampler.shift)

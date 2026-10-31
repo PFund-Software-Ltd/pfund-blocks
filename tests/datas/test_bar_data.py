@@ -388,7 +388,7 @@ class TestBindResampler:
             create_data("5m").bind_resampler(other_data)  # ty: ignore[invalid-argument-type]
 
     def test_coarser_resampler_raises(self):
-        with pytest.raises(ValueError, match="do not fit"):
+        with pytest.raises(ValueError, match="must be finer"):
             create_data("1m").bind_resampler(create_data("5m"))
 
     def test_market_data_checks_still_apply(self):
