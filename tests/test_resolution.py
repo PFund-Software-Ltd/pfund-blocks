@@ -103,6 +103,11 @@ class TestParsing:
         with pytest.raises(ValueError, match="only period 1 is supported"):
             Resolution(value)
 
+    @pytest.mark.parametrize("value", ["2t", "5tick", "100t"])
+    def test_tick_rejects_period(self, value: str):
+        with pytest.raises(ValueError, match="only period 1 is supported"):
+            Resolution(value)
+
     @pytest.mark.parametrize(
         "value, depth", [("10q_L2", 10), ("50quote_L2", 50), ("5q_L3", 5)]
     )
@@ -217,7 +222,6 @@ class TestEquality:
         assert Resolution("1m") != Resolution("2m")
         assert Resolution("1q_L1") != Resolution("1q_L2")
         assert Resolution("1q") != Resolution("1t")
-        assert Resolution("2t") != Resolution("1t")
 
     def test_non_resolution_is_not_equal(self):
         assert Resolution("1m") != "1m"
@@ -261,7 +265,6 @@ class TestOrdering:
 
     def test_period_within_unit(self):
         assert Resolution("1m") > Resolution("5m")
-        assert Resolution("2t") < Resolution("1t")
 
     def test_quote_finer_than_tick(self):
         assert Resolution("1q") > Resolution("1t")
@@ -278,7 +281,6 @@ class TestOrdering:
 
     def test_quote_and_tick_finer_than_any_bar(self):
         assert Resolution("1t") > Resolution("1s")
-        assert Resolution("100t") > Resolution("1s")
         assert Resolution("1q") > Resolution("1t")
 
     def test_equal_durations_are_le_and_ge(self):
@@ -341,7 +343,7 @@ class TestRotation:
 
     @pytest.mark.parametrize(
         "value, expected",
-        [("5m", "1m"), ("1m", "1m"), ("3d", "1d"), ("1q_L2", "1q_L2"), ("10t", "1t")],
+        [("5m", "1m"), ("1m", "1m"), ("3d", "1d"), ("1q_L2", "1q_L2")],
     )
     def test_to_unit(self, value: str, expected: str):
         assert repr(Resolution(value).to_unit()) == expected
@@ -387,8 +389,7 @@ class TestHigherResolutions:
         assert Resolution("1q_L3").get_higher_resolutions() == []
 
     def test_from_tick(self):
-        assert [repr(r) for r in Resolution("5t").get_higher_resolutions()] == [
-            "1t",
+        assert [repr(r) for r in Resolution("1t").get_higher_resolutions()] == [
             "1q_L1",
             "1q_L2",
             "1q_L3",
@@ -514,7 +515,7 @@ class TestImmutability:
             2,
         )
 
-    @pytest.mark.parametrize("value", ["1m", "5h", "1q_L1", "1q_L3", "10t", "1mo"])
+    @pytest.mark.parametrize("value", ["1m", "5h", "1q_L1", "1q_L3", "1t", "1mo"])
     def test_pickle_round_trip(self, value: str):
         resolution = Resolution(value)
         restored = pickle.loads(pickle.dumps(resolution))

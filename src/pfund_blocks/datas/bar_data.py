@@ -137,15 +137,22 @@ class BarData(MarketData):
     candlestick = bar
 
     def bind_resampler(self, resampler: TickData | BarData):
-        """Resamples this data from the resampler, see MarketData.bind_resampler().
+        """Resamples this data from the resampler, e.g. a 5m bar data binds a 1m bar data as its resampler.
+
+        A data can only have one resampler, otherwise the same volume would be counted more than once.
 
         A resampler's bars must fit in this data's windows, otherwise binding raises, instead of the first bar
         that doesn't fit raising mid-session. e.g. a 3m bar from 9:03 to 9:06 can't fit in a 5m bar.
         """
         if not isinstance(resampler, (TickData, BarData)):
             raise TypeError(f"resampler must be TickData or BarData, got {type(resampler).__name__}")
-        # NOTE: a resampler that isn't finer is rejected by MarketData.bind_resampler()
-        if isinstance(resampler, BarData) and resampler.resolution > self.resolution:
+        if self._resampler is not None:
+            raise ValueError(f"{self.resolution!r} data already has a resampler {self._resampler.resolution!r}")
+        if resampler.product != self.product:
+            raise ValueError(f"resampler's product {resampler.product} does not match {self.product}")
+        if resampler.resolution <= self.resolution:
+            raise ValueError(f"resampler's resolution {resampler.resolution!r} must be finer than {self.resolution!r}")
+        if isinstance(resampler, BarData):
             # any window of this data and the resampler's bar it starts in, the same holds for all the other windows
             start_ts, end_ts = get_bar_window(0, self.resolution, self.shift)
             resampler_start_ts, resampler_end_ts = get_bar_window(start_ts, resampler.resolution, resampler.shift)
@@ -155,7 +162,26 @@ class BarData(MarketData):
                 raise ValueError(
                     f"{resampler.resolution!r} bars with shift={resampler.shift} do not fit in {self.resolution!r} bars with shift={self.shift}"
                 )
-        super().bind_resampler(resampler)
+        self._resampler = resampler
+        resampler.add_resamplee(self)
+
+    def unbind_resampler(self):
+        if self._resampler is not None:
+            self._resampler.remove_resamplee(self)
+            self._resampler = None
+
+    def update(self, value: Tick | Bar) -> list[ClosedBar]:
+        """Updates the data and all its resamplees, returns every bar closed by this update, finest first.
+
+        A resamplee only receives closed bars from its resampler, otherwise the same volume would be counted twice.
+        e.g. for 1m -> 5m -> 1h, a closed 1m bar updates the 5m bar, and the 1h bar is only updated if that closed the 5m bar.
+        """
+        closed_bars = self._update(value)
+        all_closed_bars = list(closed_bars)
+        for resamplee in self._resamplees:
+            for closed_bar in closed_bars:
+                all_closed_bars += resamplee.update(closed_bar)
+        return all_closed_bars
 
     def _update(self, value: Tick | Bar) -> list[ClosedBar]:
         """Updates the current bar, returns the bars closed by this update, oldest first.

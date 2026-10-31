@@ -25,7 +25,7 @@ T0 = (
 
 
 class OtherData(MarketData):
-    def _update(self, value: Any) -> list[Any]:
+    def update(self, value: Any) -> list[Any]:
         return []
 
 
@@ -387,17 +387,161 @@ class TestBindResampler:
             other_data = OtherData(create_product(), Resolution("1m"))
             create_data("5m").bind_resampler(other_data)  # ty: ignore[invalid-argument-type]
 
-    def test_coarser_resampler_raises(self):
-        with pytest.raises(ValueError, match="must be finer"):
-            create_data("1m").bind_resampler(create_data("5m"))
+    def test_links_both_sides(self):
+        m1, m5 = create_data("1m"), create_data("5m")
+        m5.bind_resampler(m1)
+        assert m5.get_resampler() is m1
+        assert m1.get_resamplees() == [m5]
+        assert m5.is_resamplee() and not m5.is_resampler()
+        assert m1.is_resampler() and not m1.is_resamplee()
 
-    def test_market_data_checks_still_apply(self):
+    def test_not_bound_by_default(self):
+        data = create_data()
+        assert data.get_resampler() is None
+        assert data.get_resamplees() == []
+        assert not data.is_resamplee()
+        assert not data.is_resampler()
+
+    def test_resampler_can_have_many_resamplees(self):
+        m1, m5, m15 = create_data("1m"), create_data("5m"), create_data("15m")
+        m5.bind_resampler(m1)
+        m15.bind_resampler(m1)
+        assert m1.get_resamplees() == [m5, m15]
+
+    def test_second_resampler_raises(self):
+        m1, s1, m5 = create_data("1m"), create_data("1s"), create_data("5m")
+        m5.bind_resampler(m1)
+        with pytest.raises(ValueError, match="already has a resampler"):
+            m5.bind_resampler(s1)
+        assert m5.get_resampler() is m1
+        assert s1.get_resamplees() == []
+
+    def test_same_resampler_again_raises(self):
+        m1, m5 = create_data("1m"), create_data("5m")
+        m5.bind_resampler(m1)
+        with pytest.raises(ValueError, match="already has a resampler"):
+            m5.bind_resampler(m1)
+        assert m1.get_resamplees() == [m5]
+
+    def test_different_product_raises(self):
+        m1, m5 = (
+            create_data("1m", symbol="ETHUSDT"),
+            create_data("5m", symbol="BTCUSDT"),
+        )
         with pytest.raises(ValueError, match="does not match"):
-            create_data("5m", symbol="BTCUSDT").bind_resampler(
-                create_data("1m", symbol="ETHUSDT")
-            )
+            m5.bind_resampler(m1)
+        assert not m5.is_resamplee()
+        assert not m1.is_resampler()
+
+    @pytest.mark.parametrize(
+        "resampler, resamplee",
+        [
+            ("5m", "1m"),  # coarser
+            ("5m", "5m"),  # same
+            ("60m", "1h"),  # same in other words
+        ],
+    )
+    def test_resampler_that_is_not_finer_raises(self, resampler: str, resamplee: str):
         with pytest.raises(ValueError, match="must be finer"):
-            create_data("5m").bind_resampler(create_data("5m"))
+            create_data(resamplee).bind_resampler(create_data(resampler))
+
+
+class TestUnbindResampler:
+    def test_unlinks_both_sides(self):
+        m1, m5 = create_data("1m"), create_data("5m")
+        m5.bind_resampler(m1)
+        m5.unbind_resampler()
+        assert m5.get_resampler() is None
+        assert m1.get_resamplees() == []
+
+    def test_without_resampler_does_nothing(self):
+        m5 = create_data("5m")
+        m5.unbind_resampler()
+        assert m5.get_resampler() is None
+
+    def test_can_bind_again(self):
+        m1, s1, m5 = create_data("1m"), create_data("1s"), create_data("5m")
+        m5.bind_resampler(m1)
+        m5.unbind_resampler()
+        m5.bind_resampler(s1)
+        assert m5.get_resampler() is s1
+
+    def test_removes_the_right_resamplee(self):
+        m1, m5, m15 = create_data("1m"), create_data("5m"), create_data("15m")
+        m5.bind_resampler(m1)
+        m15.bind_resampler(m1)
+        m5.unbind_resampler()
+        assert m1.get_resamplees() == [m15]
+
+
+class ForwardingData(BarData):
+    """Closes whatever closed_bars it is told to, and records what it receives."""
+
+    def __init__(self, resolution: str, closed_bars: list[Bar] | None = None):
+        super().__init__(create_product(), Resolution(resolution))
+        self.closed_bars: list[Bar] = closed_bars or []
+        self.received: list[Tick | Bar] = []
+
+    def _update(self, value: Tick | Bar) -> list[Bar]:
+        self.received.append(value)
+        return self.closed_bars
+
+
+def create_forwarding_data(
+    resolution: str = "1m", closed_bars: list[Bar] | None = None
+) -> ForwardingData:
+    return ForwardingData(resolution, closed_bars)
+
+
+TICK = create_tick()
+BAR_A, BAR_B, BAR_C = create_bar(minute=0), create_bar(minute=1), create_bar(minute=2)
+
+
+class TestForwarding:
+    def test_without_closed_bars_resamplees_receive_nothing(self):
+        m1, m5 = create_forwarding_data("1m"), create_forwarding_data("5m")
+        m5.bind_resampler(m1)
+        assert m1.update(TICK) == []
+        assert m1.received == [TICK]
+        assert m5.received == []
+
+    def test_each_closed_bar_goes_to_every_resamplee_oldest_first(self):
+        m1, m5, m15 = (
+            create_forwarding_data("1m", [BAR_A, BAR_B]),
+            create_forwarding_data("5m"),
+            create_forwarding_data("15m"),
+        )
+        m5.bind_resampler(m1)
+        m15.bind_resampler(m1)
+        assert m1.update(TICK) == [BAR_A, BAR_B]
+        assert m5.received == [BAR_A, BAR_B]
+        assert m15.received == [BAR_A, BAR_B]
+
+    def test_returns_all_closed_bars_finest_first(self):
+        m1, m5, h1 = (
+            create_forwarding_data("1m", [BAR_A]),
+            create_forwarding_data("5m", [BAR_B]),
+            create_forwarding_data("1h", [BAR_C]),
+        )
+        m5.bind_resampler(m1)
+        h1.bind_resampler(m5)
+        assert m1.update(TICK) == [
+            BAR_A,
+            BAR_B,
+            BAR_C,
+        ]
+        assert m5.received == [BAR_A]
+        assert h1.received == [BAR_B]
+
+    def test_unbound_resamplee_receives_nothing(self):
+        m1, m5 = (
+            create_forwarding_data("1m", [BAR_A]),
+            create_forwarding_data("5m"),
+        )
+        m5.bind_resampler(m1)
+        m5.unbind_resampler()
+        m1.update(TICK)
+        assert m5.received == []
 
 
 class TestUpdateValidation:

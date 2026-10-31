@@ -65,6 +65,10 @@ class Resolution:
         period, timeframe_str, orderbook_level = self._parse(resolution)
         object.__setattr__(self, "period", int(period))
         object.__setattr__(self, "timeframe", Timeframe(timeframe_str))
+        if self.is_tick() and self.period != 1:
+            raise ValueError(
+                f"Invalid period {self.period} for ticks, only period 1 is supported"
+            )
         object.__setattr__(
             self, "orderbook_level", self._resolve_orderbook_level(orderbook_level)
         )
@@ -142,13 +146,12 @@ class Resolution:
         """Higher tuple = higher resolution.
         Time-based resolutions compare by negated total seconds (so 1h == 60m, 120m < 1h),
         quote and tick (negative timeframe values, negated to 2 and 1) rank above all of them,
-        then compare by unit, then ticks by smaller period,
-        quotes by deeper orderbook level, then by deeper orderbook depth (= period), e.g. 50q_L2 > 10q_L2.
+        then compare by unit, then quotes by deeper orderbook level, then by deeper orderbook depth (= period), e.g. 50q_L2 > 10q_L2.
         """
         if self.is_quote():
             return (-self.timeframe.value, self.orderbook_level or 1, self.period)
         if self.is_tick():
-            return (-self.timeframe.value, -self.period, 1)
+            return (-self.timeframe.value, 0, 1)
         return (-(self.period * self.timeframe.value), 0, 1)
 
     def is_quote_l1(self) -> bool:
