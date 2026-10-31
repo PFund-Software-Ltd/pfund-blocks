@@ -117,7 +117,7 @@ class BaseWebSocketAPI[AccountT: BaseAccount = BaseAccount](ABC):
             channel = Channel.tradebook
         else:
             channel = Channel.candlestick
-        self._channel_infos[full_channel] = ChannelInfo(channel=channel, product=product.name)
+        self._channel_infos[full_channel] = ChannelInfo(channel=channel, product=product.name, resolution=repr(resolution))
         return full_channel
 
     @abstractmethod
@@ -154,7 +154,7 @@ class BaseWebSocketAPI[AccountT: BaseAccount = BaseAccount](ABC):
                 continue  # unmapped, i.e. the venue doesn't stream it
             if echannel not in channels:
                 channels.append(echannel)
-                self._channel_infos[echannel] = ChannelInfo(channel=Channel(private_channel), product=None)
+                self._channel_infos[echannel] = ChannelInfo(channel=Channel(private_channel), product=None, resolution=None)
         return channels
 
     def add_channel(self, channel: FullChannel, *, channel_type: ChannelType | Literal["public", "private"]):
@@ -309,7 +309,7 @@ class BaseWebSocketAPI[AccountT: BaseAccount = BaseAccount](ABC):
                 await self.subscribe(ws, self._channels[channel_type], channel_type)
                 # ends normally when closed with code 1000 (by disconnect() or the server), raises when dropped
                 async for raw_msg in ws:
-                    received_at = time.time()
+                    received_at = time.time_ns()
                     try:
                         # NOTE: _parse_message() runs even without a callback, it also handles control messages
                         if (result := self._parse_message(ws, raw_msg)) is None or self._callback is None:
@@ -324,7 +324,7 @@ class BaseWebSocketAPI[AccountT: BaseAccount = BaseAccount](ABC):
                             "source": self.venue,
                             "account": account.name if account else None,
                             "product": channel_info.product if channel_info else None,
-                            "channel": full_channel,
+                            "resolution": channel_info.resolution if channel_info else None,
                             "received_at": received_at,
                             "message": raw_msg if self._include_raw_message else None,
                             "data": data,

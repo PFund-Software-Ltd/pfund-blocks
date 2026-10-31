@@ -144,7 +144,7 @@ class BaseRestAPI[AccountT: BaseAccount = BaseAccount]:
                 json=signed_request.body if signed_request.content is None else None,
                 headers=signed_request.headers,
             )
-            reply["received_at"] = time.time()
+            reply["received_at"] = time.time_ns()
             response = http_response.json()
             reply["status_code"] = http_response.status_code
             reply["response"] = response

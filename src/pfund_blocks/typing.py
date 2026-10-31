@@ -32,6 +32,7 @@ class Endpoint(NamedTuple):
 class ChannelInfo(NamedTuple):
     channel: Channel  # e.g. Channel.candlestick
     product: ProductName | None  # None for private channels
+    resolution: str | None  # e.g. "1m", None for private channels
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,7 +77,7 @@ class Reply(TypedDict):
     account: str | None  # account name, None for public requests
     request: RequestData
     status_code: int | None  # None if no response is received
-    received_at: float | None  # UTC unix time in seconds when the response was received, None if not received
+    received_at: int | None  # int64 ns since epoch when the response was received, None if not received
     response: RawResponse | None  # None if no response is received
     data: ParsedResponse | None  # None if not parsed
 
@@ -87,8 +88,8 @@ class Message(TypedDict):
     source: str  # a trading venue (e.g. BYBIT) or a data source (e.g. YAHOO_FINANCE)
     account: AccountName | None  # None for public messages
     product: ProductName | None  # None if the message is not for a single product, e.g. balances
-    channel: FullChannel | None  # the subscribed channel the message belongs to, e.g. "kline.1.BTCUSDT", None only for a venue's error that names no channel
-    received_at: float  # UTC unix time in seconds when the message was received
+    resolution: str | None  # e.g. "1m", None if the message is not market data
+    received_at: int  # int64 ns since epoch when the message was received
     message: RawMessage | None  # the venue's raw message, None if opted out
     data: ParsedMessage | None  # None if not parsed or an error
     error: str | None  # the venue's error, e.g. a rejected subscription, None if not an error
