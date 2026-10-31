@@ -25,7 +25,7 @@ from pfund_blocks.enums.env import Environment
 from pfund_blocks.typing import Endpoint, Reply, Request
 
 
-class BaseRestAPI:
+class BaseRestAPI[AccountT: BaseAccount = BaseAccount]:
     venue: ClassVar[str]  # upper case, consistent with BaseAccount.venue, e.g. "BYBIT"
     urls: ClassVar[dict[Literal[Environment.PAPER, Environment.LIVE], str]]
     version: ClassVar[str | None] = None  # e.g. "v5" for Bybit, None if the venue's API is not versioned
@@ -84,7 +84,7 @@ class BaseRestAPI:
             private=name in self.private_endpoints,
         )
 
-    def _check_account(self, account: BaseAccount | None) -> BaseAccount:
+    def _check_account(self, account: AccountT | None) -> AccountT:
         """Checks the account for a private request, which must be signed by an account
         in the same environment and venue as this REST API.
 
@@ -103,7 +103,7 @@ class BaseRestAPI:
             )
         return account
 
-    async def send(self, request: Request, account: BaseAccount | None = None) -> Reply:
+    async def send(self, request: Request, account: AccountT | None = None) -> Reply:
         """Signs the request if private, sends it and returns a Reply.
 
         The venue's parser checks the venue-level success and error (e.g. Bybit's retCode and retMsg),

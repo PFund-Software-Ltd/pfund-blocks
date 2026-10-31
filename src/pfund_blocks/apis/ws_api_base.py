@@ -38,7 +38,7 @@ class WebSocket(ClientConnection):
     name: WebSocketName  # set once connected, for logging and routing
 
 
-class BaseWebSocketAPI(ABC):
+class BaseWebSocketAPI[AccountT: BaseAccount = BaseAccount](ABC):
     venue: ClassVar[str]  # upper case, consistent with BaseRestAPI.venue, e.g. "BYBIT"
     urls: ClassVar[dict[Literal[Environment.PAPER, Environment.LIVE], dict[ChannelType, str]]]
     version: ClassVar[str | None] = None  # e.g. "v5" for Bybit, None if the venue's API is not versioned
@@ -57,7 +57,7 @@ class BaseWebSocketAPI(ABC):
         self._logger = logging.getLogger(f"pfund.{self.venue.lower()}")
 
         self._products: dict[ProductName, BaseProduct] = {}
-        self._accounts: dict[AccountName, BaseAccount] = {}
+        self._accounts: dict[AccountName, AccountT] = {}
         self._channels: dict[ChannelType, list[FullChannel]] = {
             ChannelType.public: [],
             ChannelType.private: [],
@@ -81,7 +81,7 @@ class BaseWebSocketAPI(ABC):
     def env(self) -> Literal[Environment.PAPER, Environment.LIVE]:
         return self._env
 
-    def add_account(self, account: BaseAccount) -> None:
+    def add_account(self, account: AccountT) -> None:
         if account.env != self._env:
             raise ValueError(f"account env {account.env} does not match websocket env {self._env}")
         if account.venue != self.venue:
@@ -226,7 +226,7 @@ class BaseWebSocketAPI(ABC):
 
     # TODO: step 4, auth before subscribe, reads its own reply via ws.recv() and raises if failed
     # @abstractmethod
-    # async def _authenticate(self, ws: WebSocket, account: BaseAccount) -> None: ...
+    # async def _authenticate(self, ws: WebSocket, account: AccountT) -> None: ...
 
     async def _ping_loop(self, ws: WebSocket) -> None:
         assert self.ping_message is not None
@@ -240,13 +240,13 @@ class BaseWebSocketAPI(ABC):
     def _get_url(self, channel_type: ChannelType) -> str:
         return self.urls[self._env][channel_type]
 
-    def _create_ws_name(self, account: BaseAccount | None = None) -> WebSocketName:
+    def _create_ws_name(self, account: AccountT | None = None) -> WebSocketName:
         if account:
             return f"{account.name}_ws"
         else:
             return f"{self.venue.lower()}_ws"
 
-    def get_websocket(self, account: BaseAccount | None = None) -> WebSocket:
+    def get_websocket(self, account: AccountT | None = None) -> WebSocket:
         """Returns the connected public websocket, or the private one of the account, e.g. for manual subscribe()."""
         ws_name = self._create_ws_name(account)
         if ws_name not in self._websockets:
@@ -285,7 +285,7 @@ class BaseWebSocketAPI(ABC):
         finally:
             self._is_running = False
 
-    async def _connect_ws(self, account: BaseAccount | None = None) -> None:
+    async def _connect_ws(self, account: AccountT | None = None) -> None:
         # one public websocket, one private websocket per account
         channel_type = ChannelType.public if account is None else ChannelType.private
         ws_name = self._create_ws_name(account)
