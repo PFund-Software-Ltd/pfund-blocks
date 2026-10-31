@@ -163,11 +163,11 @@ class BarData(MarketData):
                     f"{resampler.resolution!r} bars with shift={resampler.shift} do not fit in {self.resolution!r} bars with shift={self.shift}"
                 )
         self._resampler = resampler
-        resampler.add_resamplee(self)
+        resampler._add_resamplee(self)
 
     def unbind_resampler(self):
         if self._resampler is not None:
-            self._resampler.remove_resamplee(self)
+            self._resampler._remove_resamplee(self)
             self._resampler = None
 
     def update(self, value: Tick | Bar) -> list[ClosedBar]:

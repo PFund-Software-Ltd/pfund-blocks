@@ -54,8 +54,8 @@ class MarketData(BaseData, ABC):
     def get_resamplees(self) -> list[BarData]:
         return self._resamplees
 
-    def add_resamplee(self, resamplee: BarData):
+    def _add_resamplee(self, resamplee: BarData):
         self._resamplees.append(resamplee)
 
-    def remove_resamplee(self, resamplee: BarData):
+    def _remove_resamplee(self, resamplee: BarData):
         self._resamplees.remove(resamplee)
