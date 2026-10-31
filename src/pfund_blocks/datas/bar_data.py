@@ -136,6 +136,27 @@ class BarData(MarketData):
     kline = bar
     candlestick = bar
 
+    def can_resample_from(self, resolution: Resolution, shift: int = 0) -> bool:
+        """Whether data in the resolution can be resampled into this data.
+
+        A tick always fits, a bar must be finer and fit in this data's windows,
+        e.g. a 6m bar can be resampled from 3m bars but not from 5m bars.
+        Quotes can't be resampled.
+
+        Args:
+            shift: the shift of the resolution's bars, see get_bar_window().
+        """
+        if resolution.is_tick():
+            return True
+        if not resolution.is_bar() or resolution <= self.resolution:
+            return False
+        # any window of this data and the resampler's bar it starts in, the same holds for all the other windows
+        start_ts, end_ts = get_bar_window(0, self.resolution, self.shift)
+        resampler_start_ts, resampler_end_ts = get_bar_window(start_ts, resolution, shift)
+        starts_together = resampler_start_ts == start_ts  # e.g. 1m bars with shift=0 don't start with 5m bars with shift=30
+        is_whole_number = (end_ts - start_ts) % (resampler_end_ts - resampler_start_ts) == 0  # e.g. a 5m bar isn't a whole number of 3m bars
+        return starts_together and is_whole_number
+
     def bind_resampler(self, resampler: TickData | BarData):
         """Resamples this data from the resampler, e.g. a 5m bar data binds a 1m bar data as its resampler.
 
@@ -152,16 +173,10 @@ class BarData(MarketData):
             raise ValueError(f"resampler's product {resampler.product} does not match {self.product}")
         if resampler.resolution <= self.resolution:
             raise ValueError(f"resampler's resolution {resampler.resolution!r} must be finer than {self.resolution!r}")
-        if isinstance(resampler, BarData):
-            # any window of this data and the resampler's bar it starts in, the same holds for all the other windows
-            start_ts, end_ts = get_bar_window(0, self.resolution, self.shift)
-            resampler_start_ts, resampler_end_ts = get_bar_window(start_ts, resampler.resolution, resampler.shift)
-            starts_together = resampler_start_ts == start_ts  # e.g. 1m bars with shift=0 don't start with 5m bars with shift=30
-            is_whole_number = (end_ts - start_ts) % (resampler_end_ts - resampler_start_ts) == 0  # e.g. a 5m bar isn't a whole number of 3m bars
-            if not (starts_together and is_whole_number):
-                raise ValueError(
-                    f"{resampler.resolution!r} bars with shift={resampler.shift} do not fit in {self.resolution!r} bars with shift={self.shift}"
-                )
+        if isinstance(resampler, BarData) and not self.can_resample_from(resampler.resolution, resampler.shift):
+            raise ValueError(
+                f"{resampler.resolution!r} bars with shift={resampler.shift} do not fit in {self.resolution!r} bars with shift={self.shift}"
+            )
         self._resampler = resampler
         resampler._add_resamplee(self)
 

@@ -446,6 +446,60 @@ class TestBindResampler:
             create_data(resamplee).bind_resampler(create_data(resampler))
 
 
+class TestCanResampleFrom:
+    @pytest.mark.parametrize(
+        ("resolution", "expected"),
+        [
+            ("1t", True),  # a tick always fits
+            ("1m", True),
+            ("3m", True),
+            ("30s", True),
+            ("5m", False),  # 6m isn't a whole number of 5m bars
+            ("6m", False),  # same resolution, not finer
+            ("15m", False),  # coarser
+            ("1q", False),  # quotes can't be resampled
+            ("1q_L2", False),
+        ],
+    )
+    def test_6m_bar(self, resolution: str, expected: bool):
+        assert create_data("6m").can_resample_from(Resolution(resolution)) is expected
+
+    @pytest.mark.parametrize(
+        ("data_shift", "resolution", "resampler_shift", "expected"),
+        [
+            (30, "1m", 0, False),  # 1m bars with shift=0 don't start with 5m bars with shift=30
+            (30, "1m", 30, True),  # both start 30 seconds into the minute
+            (0, "1m", 30, False),
+            (30, "1t", 0, True),  # a tick has no window, so a shift doesn't matter
+        ],
+    )
+    def test_shift(self, data_shift: int, resolution: str, resampler_shift: int, expected: bool):
+        data = create_data("5m", shift=data_shift)
+        assert data.can_resample_from(Resolution(resolution), resampler_shift) is expected
+
+    def test_invalid_shift_raises(self):
+        with pytest.raises(ValueError, match="shift"):
+            create_data("5m").can_resample_from(Resolution("1s"), shift=5)
+
+    def test_does_not_bind(self):
+        m5 = create_data("5m")
+        assert m5.can_resample_from(Resolution("1m"))
+        assert m5.get_resampler() is None
+        assert not m5.is_resamplee()
+
+    @pytest.mark.parametrize(
+        ("resamplee", "resampler"), [("5m", "1m"), ("6m", "3m"), ("6m", "5m"), ("5m", "3m"), ("1h", "1m")]
+    )
+    def test_agrees_with_bind_resampler(self, resamplee: str, resampler: str):
+        data = create_data(resamplee)
+        if data.can_resample_from(Resolution(resampler)):
+            data.bind_resampler(create_data(resampler))
+            assert data.is_resamplee()
+        else:
+            with pytest.raises(ValueError, match="do not fit"):
+                data.bind_resampler(create_data(resampler))
+
+
 class TestUnbindResampler:
     def test_unlinks_both_sides(self):
         m1, m5 = create_data("1m"), create_data("5m")
