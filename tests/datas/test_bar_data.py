@@ -691,6 +691,23 @@ class TestMergeTicks:
         assert data.bar is not None
         assert not data.bar.is_closed
 
+    def test_late_tick_in_the_window_keeps_the_close_and_updated_ts(self):
+        data = create_data("5m")
+        data.update(create_tick(minute=2, price=110.0, volume=2.0))
+        data.update(create_tick(minute=1, price=90.0, volume=3.0))
+        bar = data.bar
+        assert bar is not None
+        assert bar.close == 110.0
+        assert bar.updated_ts == T0 + 2 * MINUTE
+        assert (bar.high, bar.low, bar.volume) == (110.0, 90.0, 5.0)
+
+    def test_tick_with_the_same_ts_updates_the_close(self):
+        data = create_data("5m")
+        data.update(create_tick(minute=1, price=110.0))
+        data.update(create_tick(minute=1, price=120.0))
+        assert data.bar is not None
+        assert data.bar.close == 120.0
+
     def test_older_tick_is_ignored(self):
         data = create_data("5m")
         data.update(create_tick(minute=5, price=100.0))
@@ -717,6 +734,17 @@ class TestMergeTicks:
 
 
 class TestMergeFinerBars:
+    def test_late_bar_in_the_window_keeps_the_close_and_updated_ts(self):
+        data = create_data("5m")
+        latest = create_bar(minute=2, open=110.0, volume=2.0)
+        data.update(latest)
+        data.update(create_bar(minute=1, open=90.0, volume=3.0))
+        bar = data.bar
+        assert bar is not None
+        assert bar.close == 110.0
+        assert bar.updated_ts == latest.updated_ts
+        assert (bar.high, bar.low, bar.volume) == (110.0, 90.0, 5.0)
+
     def test_first_bar_opens_the_window_it_falls_in(self):
         data = create_data("5m")
         m1_bar = create_bar(

@@ -230,10 +230,11 @@ class TestForwarding:
     def test_older_tick_is_still_forwarded(self):
         data, m1 = create_data(), create_bar_data("1m")
         m1.bind_resampler(data)
-        data.update(create_tick(minute=0.5, volume=2.0))
-        data.update(create_tick(minute=0, volume=3.0))
+        data.update(create_tick(minute=0.5, price=110.0, volume=2.0))
+        data.update(create_tick(minute=0, price=100.0, volume=3.0))
         assert m1.bar is not None
         assert m1.bar.volume == 5.0
+        assert m1.bar.close == 110.0
 
     def test_unbound_resamplee_receives_nothing(self):
         data, m1 = create_data(), create_bar_data()

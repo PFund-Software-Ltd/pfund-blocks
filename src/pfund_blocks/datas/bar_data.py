@@ -267,6 +267,9 @@ class BarData(MarketData):
         and also closes the current bar if it is still open, with its last known state.
         A value older than the current bar, or in the window of a closed current bar, is ignored.
 
+        A value in the current window that arrives late, i.e. older than updated_ts, still updates high, low and volume,
+        but keeps the current close and updated_ts. The open can't be corrected, a bar doesn't store when its first value happened.
+
         A finer bar that ends with the window closes the bar it is merged into. A tick can't,
         it only closes a bar when it opens the next one.
         """
@@ -291,6 +294,10 @@ class BarData(MarketData):
         else:
             start_ts, end_ts = current.start_ts, current.end_ts
             open_, high, low, volume = current.open, max(current.high, high), min(current.low, low), current.volume + volume
+            # a late value still adds to high, low and volume, but it can't change the close
+            is_late = updated_ts < current.updated_ts
+            if is_late:
+                close, updated_ts = current.close, current.updated_ts
         # the current bar never received its close before moving on to a later window
         if is_new_bar and current is not None and not current.is_closed:
             closed_bars.append(structs.replace(current, is_closed=True))
