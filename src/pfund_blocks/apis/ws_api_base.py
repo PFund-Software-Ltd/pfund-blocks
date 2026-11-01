@@ -112,13 +112,7 @@ class BaseWebSocketAPI[AccountT: BaseAccount = BaseAccount](ABC):
             )
         full_channel = self._create_market_data_channel(product, resolution)
         self.add_product(product)
-        if resolution.is_quote():
-            channel = Channel.orderbook
-        elif resolution.is_tick():
-            channel = Channel.tradebook
-        else:
-            channel = Channel.candlestick
-        self._channel_infos[full_channel] = ChannelInfo(channel=channel, product=product.name, resolution=repr(resolution))
+        self._channel_infos[full_channel] = ChannelInfo(channel=resolution.to_channel(), product=product.name, resolution=repr(resolution))
         return full_channel
 
     @abstractmethod

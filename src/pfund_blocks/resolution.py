@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 import re
 
+from pfund_blocks.enums.channel import Channel
 from pfund_blocks.enums.timeframe import Timeframe
 
 if TYPE_CHECKING:
@@ -153,6 +154,14 @@ class Resolution:
         if self.is_tick():
             return (-self.timeframe.value, 0, 1)
         return (-(self.period * self.timeframe.value), 0, 1)
+
+    def to_channel(self) -> Channel:
+        if self.is_quote():
+            return Channel.orderbook
+        elif self.is_tick():
+            return Channel.tradebook
+        else:
+            return Channel.candlestick
 
     def is_quote_l1(self) -> bool:
         return self.is_quote() and self.orderbook_level == 1
