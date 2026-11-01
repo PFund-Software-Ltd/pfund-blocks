@@ -78,7 +78,8 @@ class DummyWebSocketAPI(BaseWebSocketAPI):
     ) -> FullChannel:
         return f"{resolution!r}.{product.symbol}"
 
-    def get_supported_resolutions(self, product: BaseProduct) -> list[Resolution]:
+    @classmethod
+    def get_supported_resolutions(cls, product: BaseProduct) -> list[Resolution]:
         return [Resolution("1m"), Resolution("1t"), Resolution("1q")]
 
     async def subscribe(

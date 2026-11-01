@@ -124,8 +124,9 @@ class BaseWebSocketAPI[AccountT: BaseAccount = BaseAccount](ABC):
     @abstractmethod
     def _create_market_data_channel(self, product: BaseProduct, resolution: Resolution) -> FullChannel: ...
 
+    @classmethod
     @abstractmethod
-    def get_supported_resolutions(self, product: BaseProduct) -> list[Resolution]:
+    def get_supported_resolutions(cls, product: BaseProduct) -> list[Resolution]:
         """Returns the resolutions the venue streams for the product, checked in create_market_data_channel(),
         e.g. Bybit's depend on the product's category.
         """
