@@ -337,7 +337,7 @@ class TestMessageFlow:
         assert message["product"] == "DUMMY_BTCUSDT"
         assert message["resolution"] == "1m"
         assert message["data"] == [10, 20]
-        assert message["message"] == kline(1, 2)
+        assert message["message"] == {"topic": KLINE, "data": [1, 2]}
         assert isinstance(message["received_at"], int)
         assert message["error"] is None
 
@@ -351,7 +351,7 @@ class TestMessageFlow:
         assert message["resolution"] is None
         assert message["data"] is None
 
-    def test_no_parser_passes_the_raw_message_only(self):
+    def test_no_parser_passes_the_decoded_message_only(self):
         api = NoParserWebSocketAPI()
         api.add_channel(
             api.create_market_data_channel(create_product(), Resolution("1m")),
@@ -361,7 +361,7 @@ class TestMessageFlow:
         api.set_callback(received.append)
         asyncio.run(run(api, Server([kline(1)]), until=lambda: len(received) == 1))
         message = received[0]
-        assert message["message"] == kline(1)
+        assert message["message"] == {"topic": KLINE, "data": [1]}
         assert message["data"] is None
         assert message["error"] is None
 

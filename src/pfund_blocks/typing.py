@@ -83,13 +83,13 @@ class Reply(TypedDict):
 
 
 class Message(TypedDict):
-    """A received data or error message, with both the raw and the parsed message."""
+    """A received data or error message, with both the decoded and the parsed message."""
 
     source: str  # a trading venue (e.g. BYBIT) or a data source (e.g. YAHOO_FINANCE)
     account: AccountName | None  # None for public messages
     product: ProductName | None  # None if the message is not for a single product, e.g. balances
     resolution: str | None  # e.g. "1m", None if the message is not market data
     received_at: int  # int64 ns since epoch when the message was received
-    message: RawMessage | None  # the venue's raw message, None if opted out
+    message: DecodedMessage | None  # the venue's decoded but unparsed message, None if opted out
     data: ParsedMessage | None  # None if not parsed or an error
     error: str | None  # the venue's error, e.g. a rejected subscription, None if not an error

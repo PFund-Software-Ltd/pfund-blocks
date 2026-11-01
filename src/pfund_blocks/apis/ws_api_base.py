@@ -192,7 +192,7 @@ class BaseWebSocketAPI[AccountT: BaseAccount = BaseAccount](ABC):
         The callback can be sync or async, a sync one runs in the event loop, so it should return quickly.
 
         Args:
-            include_raw_message: if False, Message["message"] (the venue's raw message) is None,
+            include_raw_message: if False, Message["message"] (the venue's decoded but unparsed message) is None,
                 e.g. to reduce the size of messages serialized via zeromq when only the parsed data is needed.
         """
         if not include_raw_message and self.parser is None:
@@ -349,7 +349,7 @@ class BaseWebSocketAPI[AccountT: BaseAccount = BaseAccount](ABC):
                             "product": channel_info.product if channel_info else None,
                             "resolution": channel_info.resolution if channel_info else None,
                             "received_at": received_at,
-                            "message": raw_msg if self._include_raw_message else None,
+                            "message": msg if self._include_raw_message else None,
                             "data": data,
                             "error": error,
                         }
