@@ -121,6 +121,9 @@ class TestGetBarWindow:
             ("1h", 30, 30 * MINUTE),
             ("5m", 30, 30 * SECOND),
             ("1d", 8, 8 * HOUR),
+            ("4h", 120, 2 * HOUR),
+            ("15m", 300, 5 * MINUTE),
+            ("2d", 30, 30 * HOUR),
         ],
     )
     def test_shift_counts_in_the_next_smaller_unit(
@@ -146,15 +149,16 @@ class TestGetBarWindow:
 
     @pytest.mark.parametrize(
         "resolution, shift",
-        [("1m", -1), ("1m", 60), ("1h", 60), ("1d", 24)],
+        [("1m", -1), ("1m", 60), ("1h", 60), ("1d", 24), ("4h", 240), ("2d", 48)],
     )
-    def test_shift_out_of_range_raises(self, resolution: str, shift: int):
+    def test_shift_of_one_bar_or_more_raises(self, resolution: str, shift: int):
         with pytest.raises(ValueError, match="must be >= 0"):
             get_bar_window(T0, Resolution(resolution), shift)
 
     def test_largest_shift_is_allowed(self):
         assert get_bar_window(T0, Resolution("1m"), 59)[0] == T0 - MINUTE + 59 * SECOND
         assert get_bar_window(T0, Resolution("1d"), 23)[0] == T0 - DAY + 23 * HOUR
+        assert get_bar_window(T0, Resolution("4h"), 239)[0] == T0 - 4 * HOUR + 239 * MINUTE
 
 
 class TestBar:
@@ -470,6 +474,8 @@ class TestCanResampleFrom:
             (30, "1m", 0, False),  # 1m bars with shift=0 don't start with 5m bars with shift=30
             (30, "1m", 30, True),  # both start 30 seconds into the minute
             (0, "1m", 30, False),
+            (120, "1m", 0, True),  # 5m bars shifted by whole minutes still start with unshifted 1m bars
+            (90, "1m", 0, False),  # 1.5 minutes is not on a 1m boundary
             (30, "1t", 0, True),  # a tick has no window, so a shift doesn't matter
         ],
     )

@@ -24,16 +24,20 @@ def get_bar_window(ts: int, resolution: Resolution, shift: int = 0) -> tuple[int
     Args:
         ts: the timestamp to find the bar for.
         resolution: must be a bar resolution, i.e. second, minute, hour or day.
-        shift: moves the bar forward, in the next smaller unit of the resolution.
-            e.g. for a 1h bar, shift=30 means the bar is 9:30 to 10:30 instead of 9:00 to 10:00.
+        shift: moves the bar forward, in the next smaller unit of the resolution, by less than one bar.
+            e.g. for a 1h bar, shift=30 (minutes) means the bar is 9:30 to 10:30 instead of 9:00 to 10:00,
+            for a 4h bar, shift=120 (minutes) means the bar is 2:00 to 6:00 instead of 0:00 to 4:00.
             Second bars can't be shifted.
     """
     if shift and resolution.is_second():
         raise ValueError(f"{resolution!r} can't be shifted, there is no smaller unit than a second")
-    max_shift = 24 if resolution.is_day() else 60
+    # the next smaller unit: hours for day bars, seconds for minute bars, minutes for hour bars
+    units_per_timeframe = 24 if resolution.is_day() else 60
+    max_shift = units_per_timeframe * resolution.period  # one bar
     if not 0 <= shift < max_shift:
         raise ValueError(f"{shift=} must be >= 0 and < {max_shift} for {resolution!r}")
-    shift_ns = shift * resolution.timeframe.value * NS_PER_SECOND // max_shift
+    unit_ns = resolution.timeframe.value * NS_PER_SECOND // units_per_timeframe
+    shift_ns = shift * unit_ns
     resolution_ns = resolution.to_seconds() * NS_PER_SECOND
     # subtract the shift before flooring so that a ts in the early part of a shifted bar stays in that bar
     start_ts = (ts - shift_ns) // resolution_ns * resolution_ns + shift_ns
