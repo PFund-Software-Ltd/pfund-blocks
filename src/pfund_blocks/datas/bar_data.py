@@ -6,6 +6,7 @@ if TYPE_CHECKING:
     from pfund_blocks.entities.products.product_base import BaseProduct
 
 from datetime import datetime
+from functools import cache
 
 from msgspec import Meta, structs
 
@@ -16,7 +17,29 @@ from pfund_blocks.resolution import Resolution
 from pfund_blocks.utils.temporal import NS_PER_SECOND, ns_to_dt
 
 
-def get_bar_window(ts: int, resolution: Resolution, shift: int = 0) -> tuple[int, int]:
+@cache
+def parse_shift(resolution: Resolution, shift: str) -> int:
+    """Returns the shift of the resolution's bars in ns, see get_bar_window(), raises if the shift is invalid.
+
+    Cached since get_bar_window() runs on every update.
+    """
+    if not shift:
+        return 0
+    if resolution.is_second():
+        raise ValueError(f"{resolution!r} can't be shifted, there is no smaller unit than a second")
+    shift_ns = Resolution(shift).to_seconds() * NS_PER_SECOND
+    resolution_ns = resolution.to_seconds() * NS_PER_SECOND
+    if shift_ns >= resolution_ns:
+        raise ValueError(f"{shift=} must be shorter than one {resolution!r} bar")
+    # the next smaller unit: hours for day bars, minutes for hour bars, seconds for minute bars
+    unit_ns = resolution.timeframe.value * NS_PER_SECOND // (24 if resolution.is_day() else 60)
+    if shift_ns % unit_ns:
+        unit = "hours" if resolution.is_day() else "minutes" if resolution.is_hour() else "seconds"
+        raise ValueError(f"{shift=} must be whole {unit} for {resolution!r}")
+    return shift_ns
+
+
+def get_bar_window(ts: int, resolution: Resolution, shift: str = "") -> tuple[int, int]:
     """Returns the (start_ts, end_ts) of the bar that ts falls in, all int64 ns since epoch.
 
     start_ts is inclusive and end_ts is exclusive, i.e. end_ts is the start_ts of the next bar.
@@ -24,20 +47,14 @@ def get_bar_window(ts: int, resolution: Resolution, shift: int = 0) -> tuple[int
     Args:
         ts: the timestamp to find the bar for.
         resolution: must be a bar resolution, i.e. second, minute, hour or day.
-        shift: moves the bar forward, in the next smaller unit of the resolution, by less than one bar.
-            e.g. for a 1h bar, shift=30 (minutes) means the bar is 9:30 to 10:30 instead of 9:00 to 10:00,
-            for a 4h bar, shift=120 (minutes) means the bar is 2:00 to 6:00 instead of 0:00 to 4:00.
+        shift: a duration that moves the bar forward, e.g. '30m', '2h'. "" (default) means no shift.
+            e.g. for a 1h bar, shift='30m' means the bar is 9:30 to 10:30 instead of 9:00 to 10:00,
+            for a 4h bar, shift='2h' means the bar is 2:00 to 6:00 instead of 0:00 to 4:00.
+            It must be shorter than one bar and in whole units of the next smaller unit,
+            i.e. whole hours for day bars, whole minutes for hour bars, whole seconds for minute bars.
             Second bars can't be shifted.
     """
-    if shift and resolution.is_second():
-        raise ValueError(f"{resolution!r} can't be shifted, there is no smaller unit than a second")
-    # the next smaller unit: hours for day bars, seconds for minute bars, minutes for hour bars
-    units_per_timeframe = 24 if resolution.is_day() else 60
-    max_shift = units_per_timeframe * resolution.period  # one bar
-    if not 0 <= shift < max_shift:
-        raise ValueError(f"{shift=} must be >= 0 and < {max_shift} for {resolution!r}")
-    unit_ns = resolution.timeframe.value * NS_PER_SECOND // units_per_timeframe
-    shift_ns = shift * unit_ns
+    shift_ns = parse_shift(resolution, shift)
     resolution_ns = resolution.to_seconds() * NS_PER_SECOND
     # subtract the shift before flooring so that a ts in the early part of a shifted bar stays in that bar
     start_ts = (ts - shift_ns) // resolution_ns * resolution_ns + shift_ns
@@ -101,18 +118,19 @@ type ClosedBar = Bar  # a Bar with is_closed=True
 
 
 class BarData(MarketData):
-    def __init__(self, product: BaseProduct, resolution: Resolution, shift: int = 0):
+    def __init__(self, product: BaseProduct, resolution: Resolution, shift: str = ""):
         """
         Args:
-            shift: see get_bar_window(), a venue's bar can't be shifted afterwards,
+            shift: a duration, e.g. '30m', see get_bar_window(). A venue's bar can't be shifted afterwards,
                 so update() rejects a bar that is not in the shifted window.
         """
         if not resolution.is_bar():
             raise ValueError(f"{resolution!r} is not a bar resolution")
-        if shift:
-            get_bar_window(0, resolution, shift)  # raises if the shift is invalid for the resolution
+        # raises if the shift is invalid for the resolution
+        # compare shifts in ns, e.g. '2h' and '120m' are the same shift
+        self._shift_ns: int = parse_shift(resolution, shift)
         super().__init__(product, resolution)
-        self.shift: int = shift
+        self.shift: str = shift
         self._bar: Bar | None = None
 
     def to_dict(self) -> dict[str, Any]:
@@ -124,10 +142,10 @@ class BarData(MarketData):
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, BarData):
             return NotImplemented
-        return (self.product, self.resolution, self.shift) == (other.product, other.resolution, other.shift)
+        return (self.product, self.resolution, self._shift_ns) == (other.product, other.resolution, other._shift_ns)
 
     def __hash__(self):
-        return hash((self.product, self.resolution, self.shift))
+        return hash((self.product, self.resolution, self._shift_ns))
 
     def __str__(self):
         if self._bar is None:
@@ -140,7 +158,7 @@ class BarData(MarketData):
     kline = bar
     candlestick = bar
 
-    def can_resample_from(self, resolution: Resolution, shift: int = 0) -> bool:
+    def can_resample_from(self, resolution: Resolution, shift: str = "") -> bool:
         """Whether data in the resolution can be resampled into this data.
 
         A tick always fits, a bar must be finer and fit in this data's windows,
@@ -157,7 +175,7 @@ class BarData(MarketData):
         # any window of this data and the resampler's bar it starts in, the same holds for all the other windows
         start_ts, end_ts = get_bar_window(0, self.resolution, self.shift)
         resampler_start_ts, resampler_end_ts = get_bar_window(start_ts, resolution, shift)
-        starts_together = resampler_start_ts == start_ts  # e.g. 1m bars with shift=0 don't start with 5m bars with shift=30
+        starts_together = resampler_start_ts == start_ts  # e.g. unshifted 1m bars don't start with 5m bars with shift='30s'
         is_whole_number = (end_ts - start_ts) % (resampler_end_ts - resampler_start_ts) == 0  # e.g. a 5m bar isn't a whole number of 3m bars
         return starts_together and is_whole_number
 
@@ -179,7 +197,7 @@ class BarData(MarketData):
             raise ValueError(f"resampler's resolution {resampler.resolution!r} must be finer than {self.resolution!r}")
         if isinstance(resampler, BarData) and not self.can_resample_from(resampler.resolution, resampler.shift):
             raise ValueError(
-                f"{resampler.resolution!r} bars with shift={resampler.shift} do not fit in {self.resolution!r} bars with shift={self.shift}"
+                f"{resampler.resolution!r} bars with shift={resampler.shift!r} do not fit in {self.resolution!r} bars with shift={self.shift!r}"
             )
         self._resampler = resampler
         resampler._add_resamplee(self)
@@ -234,7 +252,7 @@ class BarData(MarketData):
         if bar.resolution == self.resolution:
             # NOTE: only when shifted, an unshifted bar's window is whatever the venue says, e.g. a venue's daily bar may not start at 00:00 UTC
             if self.shift and (bar.start_ts, bar.end_ts) != (start_ts, end_ts):
-                raise ValueError(f"bar {bar.start_dt} → {bar.end_dt} is not in the window of {self.resolution!r} with shift={self.shift}")
+                raise ValueError(f"bar {bar.start_dt} → {bar.end_dt} is not in the window of {self.resolution!r} with shift={self.shift!r}")
         elif bar.resolution < self.resolution:
             raise ValueError(f"{bar.resolution!r} is coarser than {self.resolution!r}")
         elif not bar.is_closed:
