@@ -6,7 +6,6 @@ if TYPE_CHECKING:
     from http import HTTPMethod
 
     from pfund_blocks.entities.markets.market_base import MarketDict
-    from pfund_blocks.enums import Channel
 
 from dataclasses import dataclass, field
 
@@ -30,7 +29,6 @@ class Endpoint(NamedTuple):
 
 
 class ChannelInfo(NamedTuple):
-    channel: Channel  # e.g. Channel.candlestick
     product: ProductName | None  # None for private channels
     resolution: str | None  # e.g. "1m", None for private channels
 
@@ -87,6 +85,7 @@ class Message(TypedDict):
 
     source: str  # a trading venue (e.g. BYBIT) or a data source (e.g. YAHOO_FINANCE)
     account: AccountName | None  # None for public messages
+    channel: FullChannel | None  # the subscribed channel, e.g. "kline.1.BTCUSDT", None if unknown, e.g. an error
     product: ProductName | None  # None if the message is not for a single product, e.g. balances
     resolution: str | None  # e.g. "1m", None if the message is not market data
     received_at: int  # int64 ns since epoch when the message was received

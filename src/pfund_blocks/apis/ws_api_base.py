@@ -42,7 +42,7 @@ class BaseWebSocketAPI[AccountT: BaseAccount = BaseAccount](ABC):
     venue: ClassVar[str]  # upper case, consistent with BaseRestAPI.venue, e.g. "BYBIT"
     urls: ClassVar[dict[Literal[Environment.PAPER, Environment.LIVE], dict[ChannelType, str]]]
     version: ClassVar[str | None] = None  # e.g. "v5" for Bybit, None if the venue's API is not versioned
-    parser: ClassVar[BaseParser | None] = None  # None if messages are not parsed, i.e. callbacks only get raw messages
+    parser: ClassVar[BaseParser]
     # the venue's app-level ping, e.g. {"op": "ping"} for Bybit, None if not required.
     # NOTE: protocol-level pings (for detecting dead connections) are always sent by websockets
     ping_message: ClassVar[dict[str, Any] | None] = None
@@ -70,6 +70,7 @@ class BaseWebSocketAPI[AccountT: BaseAccount = BaseAccount](ABC):
         self._connect_task: asyncio.Task[None] | None = None
         self._callback: Callable[[Message], Awaitable[None] | None] | None = None
         self._include_raw_message = True
+        self._skip_parse_message = False
 
     @staticmethod
     def _validate_env(env: Environment | str) -> Literal[Environment.PAPER, Environment.LIVE]:
@@ -112,7 +113,7 @@ class BaseWebSocketAPI[AccountT: BaseAccount = BaseAccount](ABC):
             )
         full_channel = self._create_market_data_channel(product, resolution)
         self.add_product(product)
-        self._channel_infos[full_channel] = ChannelInfo(channel=resolution.to_channel(), product=product.name, resolution=repr(resolution))
+        self._channel_infos[full_channel] = ChannelInfo(product=product.name, resolution=repr(resolution))
         return full_channel
 
     @abstractmethod
@@ -139,8 +140,6 @@ class BaseWebSocketAPI[AccountT: BaseAccount = BaseAccount](ABC):
         NOTE: account-specific parts (e.g. Hyperliquid's user address) are not in the channel,
         they are added to the subscription request on the account's connection.
         """
-        if self.parser is None:
-            raise ValueError(f"{self.venue} has no parser, override create_private_channels() without its adapter")
         channels: list[FullChannel] = []
         for private_channel in PrivateChannel:
             try:
@@ -150,7 +149,7 @@ class BaseWebSocketAPI[AccountT: BaseAccount = BaseAccount](ABC):
                 continue  # unmapped, i.e. the venue doesn't stream it
             if echannel not in channels:
                 channels.append(echannel)
-                self._channel_infos[echannel] = ChannelInfo(channel=Channel(private_channel), product=None, resolution=None)
+                self._channel_infos[echannel] = ChannelInfo(product=None, resolution=None)
         return channels
 
     def add_channel(self, channel: FullChannel, *, channel_type: ChannelType | Literal["public", "private"]):
@@ -181,7 +180,13 @@ class BaseWebSocketAPI[AccountT: BaseAccount = BaseAccount](ABC):
         """
         ...
 
-    def set_callback(self, callback: Callable[[Message], Awaitable[None] | None], *, include_raw_message: bool = True) -> None:
+    def set_callback(
+        self,
+        callback: Callable[[Message], Awaitable[None] | None],
+        *,
+        include_raw_message: bool = True,
+        skip_parse_message: bool = False,
+    ) -> None:
         """Sets the callback that receives every data and error message (control messages are filtered out by _parse_message).
 
         The callback can be sync or async, a sync one runs in the event loop, so it should return quickly.
@@ -189,11 +194,14 @@ class BaseWebSocketAPI[AccountT: BaseAccount = BaseAccount](ABC):
         Args:
             include_raw_message: if False, Message["message"] (the venue's decoded but unparsed message) is None,
                 e.g. to reduce the size of messages serialized via zeromq when only the parsed data is needed.
+            skip_parse_message: if True, Message["data"] is None, the venue's message is not parsed,
+                e.g. to parse it later elsewhere. Errors are still parsed into Message["error"].
         """
-        if not include_raw_message and self.parser is None:
-            raise ValueError(f"{self.venue} has no parser, the venue's message can't be excluded")
+        if not include_raw_message and skip_parse_message:
+            raise ValueError(f"{self.venue}'s message is not parsed, it can't be excluded")
         self._callback = callback
         self._include_raw_message = include_raw_message
+        self._skip_parse_message = skip_parse_message
 
     @abstractmethod
     def _parse_message(self, ws: WebSocket, raw_msg: RawMessage) -> tuple[FullChannel | None, DecodedMessage] | None:
@@ -333,14 +341,15 @@ class BaseWebSocketAPI[AccountT: BaseAccount = BaseAccount](ABC):
                         if (result := self._parse_message(ws, raw_msg)) is None or self._callback is None:
                             continue
                         full_channel, msg = result
-                        error = self.parser.parse_message_error(full_channel, msg) if self.parser else None
+                        error = self.parser.parse_message_error(full_channel, msg)
                         data = None
-                        if self.parser and full_channel and error is None:
-                            data = self.parser.parse_message(self._channel_infos[full_channel].channel, msg)
+                        if not self._skip_parse_message and full_channel and error is None:
+                            data = self.parser.parse_message(full_channel, msg)
                         channel_info = self._channel_infos.get(full_channel) if full_channel else None
                         message: Message = {
                             "source": self.venue,
                             "account": account.name if account else None,
+                            "channel": full_channel,
                             "product": channel_info.product if channel_info else None,
                             "resolution": channel_info.resolution if channel_info else None,
                             "received_at": received_at,

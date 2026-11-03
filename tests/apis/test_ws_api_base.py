@@ -40,7 +40,9 @@ class DummyParser(BaseParser):
             Channel.trade: "trade_updates",
         }
     )
-    ws_api = {Channel.candlestick: "parse_candlestick"}  # noqa: RUF012
+    def parse_message(self, channel: FullChannel, message: dict[str, Any]) -> list[int] | None:
+        # e.g. "1m.BTCUSDT" -> parse_candlestick()
+        return self.parse_candlestick(message) if channel.startswith("1m.") else None
 
     def parse_candlestick(self, message: dict[str, Any]) -> list[int]:
         return [x * 10 for x in message["data"]]
@@ -103,10 +105,6 @@ class DummyWebSocketAPI(BaseWebSocketAPI):
         return msg["topic"], msg
 
 
-class NoParserWebSocketAPI(DummyWebSocketAPI):
-    parser = None
-
-
 def create_product(symbol: str = "BTCUSDT", name: str = "") -> BaseProduct:
     data = {"source": "DUMMY", "basis": "BTC_USDT_PERP", "symbol": symbol}
     return BaseProduct.model_validate({**data, "name": name} if name else data)
@@ -167,21 +165,11 @@ class TestAddProduct:
 
 
 class TestCreateMarketDataChannel:
-    @pytest.mark.parametrize(
-        "resolution, channel",
-        [
-            ("1m", Channel.candlestick),
-            ("1t", Channel.tradebook),
-            ("1q", Channel.orderbook),
-        ],
-    )
-    def test_channel_info(
-        self, api: DummyWebSocketAPI, resolution: str, channel: Channel
-    ):
+    @pytest.mark.parametrize("resolution", ["1m", "1t", "1q"])
+    def test_channel_info(self, api: DummyWebSocketAPI, resolution: str):
         product = create_product()
         full_channel = api.create_market_data_channel(product, Resolution(resolution))
         assert api._channel_infos[full_channel] == ChannelInfo(
-            channel=channel,
             product=product.name,
             resolution=repr(Resolution(resolution)),
         )
@@ -201,20 +189,10 @@ class TestCreatePrivateChannels:
     def test_mapped_channels_without_duplicates(self, api: DummyWebSocketAPI):
         assert api.create_private_channels() == ["position", "trade_updates"]
 
-    def test_channel_info_of_shared_channel_is_the_first_mapped(
-        self, api: DummyWebSocketAPI
-    ):
+    def test_channel_infos_have_no_product_and_resolution(self, api: DummyWebSocketAPI):
         api.create_private_channels()
-        assert api._channel_infos["position"] == ChannelInfo(
-            channel=Channel.position, product=None, resolution=None
-        )
-        assert api._channel_infos["trade_updates"] == ChannelInfo(
-            channel=Channel.order, product=None, resolution=None
-        )
-
-    def test_no_parser_raises(self):
-        with pytest.raises(ValueError, match="has no parser"):
-            NoParserWebSocketAPI().create_private_channels()
+        assert api._channel_infos["position"] == ChannelInfo(product=None, resolution=None)
+        assert api._channel_infos["trade_updates"] == ChannelInfo(product=None, resolution=None)
 
 
 class TestChannels:
@@ -231,11 +209,9 @@ class TestChannels:
 
 
 class TestSetCallback:
-    def test_exclude_raw_message_without_parser_raises(self):
-        with pytest.raises(ValueError, match="the venue's message can't be excluded"):
-            NoParserWebSocketAPI().set_callback(
-                lambda message: None, include_raw_message=False
-            )
+    def test_exclude_raw_message_when_skipping_parse_raises(self, api: DummyWebSocketAPI):
+        with pytest.raises(ValueError, match="is not parsed, it can't be excluded"):
+            api.set_callback(lambda message: None, include_raw_message=False, skip_parse_message=True)
 
 
 class TestWebSockets:
@@ -335,6 +311,7 @@ class TestMessageFlow:
         assert server.received == [{"op": "subscribe", "args": [KLINE]}]
         assert message["source"] == "DUMMY"
         assert message["account"] is None
+        assert message["channel"] == KLINE
         assert message["product"] == "DUMMY_BTCUSDT"
         assert message["resolution"] == "1m"
         assert message["data"] == [10, 20]
@@ -348,23 +325,23 @@ class TestMessageFlow:
         asyncio.run(run(api, server, until=lambda: len(received) == 1))
         message = received[0]
         assert message["error"] == "invalid topic"
+        assert message["channel"] is None
         assert message["product"] is None
         assert message["resolution"] is None
         assert message["data"] is None
 
-    def test_no_parser_passes_the_decoded_message_only(self):
-        api = NoParserWebSocketAPI()
-        api.add_channel(
-            api.create_market_data_channel(create_product(), Resolution("1m")),
-            channel_type="public",
-        )
-        received: list[Message] = []
-        api.set_callback(received.append)
+    def test_skip_parse_message_passes_the_decoded_message_only(self):
+        api, received = connected_api(skip_parse_message=True)
         asyncio.run(run(api, Server([kline(1)]), until=lambda: len(received) == 1))
         message = received[0]
         assert message["message"] == {"topic": KLINE, "data": [1]}
         assert message["data"] is None
         assert message["error"] is None
+
+    def test_skip_parse_message_still_parses_errors(self):
+        api, received = connected_api(skip_parse_message=True)
+        asyncio.run(run(api, Server([], reject=True), until=lambda: len(received) == 1))
+        assert received[0]["error"] == "invalid topic"
 
     def test_exclude_raw_message(self):
         api, received = connected_api(include_raw_message=False)

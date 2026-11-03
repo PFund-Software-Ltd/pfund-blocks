@@ -62,11 +62,12 @@ class BaseParser:
         """Venue's error message in the failed response of the REST API function `name`, e.g. Bybit's retMsg."""
         raise NotImplementedError(f"{type(self).__name__} does not implement parse_response_error()")
 
-    # TODO: remove parse_message() and ws_api, the WS API calls the standard parsing methods per Channel directly,
-    # e.g. Channel.candlestick -> parse_candlestick(), each declared here with its return type like parse_markets()
-    def parse_message(self, channel: Channel, message: DecodedMessage) -> Any:
-        """Parses the streaming message of the channel, e.g. Channel.candlestick."""
-        return self._parse(self.ws_api, channel, message)
+    def parse_message(self, channel: FullChannel, message: DecodedMessage) -> Any:
+        """Parses the streaming message of the subscribed channel, e.g. "kline.1.BTCUSDT" for Bybit.
+
+        The venue maps its full channel to the parsing method, since only the venue knows its channel format.
+        """
+        raise NotImplementedError(f"{type(self).__name__} does not implement parse_message()")
 
     def parse_message_error(self, channel: FullChannel | None, message: DecodedMessage) -> str | None:
         """Venue's error in the streaming message, e.g. a rejected subscription, None if not an error.
