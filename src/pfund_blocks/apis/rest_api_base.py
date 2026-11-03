@@ -19,7 +19,7 @@ import logging
 import time
 from json import JSONDecodeError
 
-from httpx2 import AsyncClient, HTTPStatusError, RequestError
+from httpx2 import AsyncClient, RequestError
 
 from pfund_blocks.enums.env import Environment
 from pfund_blocks.typing import Endpoint, Reply, Request
@@ -145,24 +145,31 @@ class BaseRestAPI[AccountT: BaseAccount = BaseAccount]:
                 headers=signed_request.headers,
             )
             reply["received_at"] = time.time_ns()
-            response = http_response.json()
+            # set before decoding, so that a non-JSON response still keeps its HTTP status
             reply["status_code"] = http_response.status_code
-            reply["response"] = response
             is_http_success = http_response.is_success
-            # NOTE: without a parser, the response is not interpreted, i.e. success is the HTTP status only
-            reply["success"] = is_http_success and (
-                self.parser is None or self.parser.parse_response_success(request.name, response)
-            )
-            if reply["success"]:
-                if self.parser is not None:
-                    reply["data"] = self.parser.parse_response(request.name, response)
+            http_error = f"HTTP {http_response.status_code} {http_response.reason_phrase}"
+            try:
+                response = http_response.json()
+            except JSONDecodeError:
+                # e.g. an HTML error page from a gateway (502/504) or a WAF (403), the body is kept for debugging
+                reply["response"] = http_response.text
+                reply["error"] = f"non-JSON response ({http_error})"
             else:
-                error = self.parser.parse_response_error(request.name, response) if self.parser else None
-                if not is_http_success:
-                    http_error = f"HTTP {http_response.status_code} {http_response.reason_phrase}"
-                    error = f"{error} ({http_error})" if error else http_error
-                reply["error"] = error or None
-        except (JSONDecodeError, RequestError, HTTPStatusError) as exc:
+                reply["response"] = response
+                # NOTE: without a parser, the response is not interpreted, i.e. success is the HTTP status only
+                reply["success"] = is_http_success and (
+                    self.parser is None or self.parser.parse_response_success(request.name, response)
+                )
+                if reply["success"]:
+                    if self.parser is not None:
+                        reply["data"] = self.parser.parse_response(request.name, response)
+                else:
+                    error = self.parser.parse_response_error(request.name, response) if self.parser else None
+                    if not is_http_success:
+                        error = f"{error} ({http_error})" if error else http_error
+                    reply["error"] = error or None
+        except RequestError as exc:
             reply["success"] = False
             reply["error"] = repr(exc)
             self._logger.exception(f'REST API "{request.name}" error:')
