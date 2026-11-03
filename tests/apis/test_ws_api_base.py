@@ -7,7 +7,13 @@ if TYPE_CHECKING:
 
     from pytest_mock import MockerFixture
 
-    from pfund_blocks.typing import DecodedMessage, FullChannel, Message, RawMessage
+    from pfund_blocks.typing import (
+        DecodedMessage,
+        FullChannel,
+        Message,
+        ProductName,
+        RawMessage,
+    )
 
 import asyncio
 import http
@@ -382,6 +388,61 @@ class TestMessageFlow:
         asyncio.run(run(api, Server([kline(1)]), until=lambda: len(received) == 1))
         assert api._websockets == {}
         assert api._is_running is False
+
+
+class SplitWebSocketAPI(DummyWebSocketAPI):
+    """Splits a kline message into one message per item, item x is product "P{x}", and drops item 0."""
+
+    def _split_message(
+        self, full_channel: FullChannel | None, msg: DecodedMessage
+    ) -> list[tuple[ProductName | None, DecodedMessage]]:
+        if full_channel != KLINE:
+            return super()._split_message(full_channel, msg)
+        return [(f"P{x}", {**msg, "data": [x]}) for x in msg["data"] if x != 0]
+
+
+def connected_split_api(**callback_kwargs: Any) -> tuple[SplitWebSocketAPI, list[Message]]:
+    api = SplitWebSocketAPI()
+    api.add_channel(
+        api.create_market_data_channel(create_product(), Resolution("1m")),
+        channel_type="public",
+    )
+    received: list[Message] = []
+    api.set_callback(received.append, **callback_kwargs)
+    return api, received
+
+
+class TestSplitMessage:
+    def test_default_keeps_the_message_with_its_channels_product(self, api: DummyWebSocketAPI):
+        channel = api.create_market_data_channel(create_product(), Resolution("1m"))
+        msg = {"topic": channel, "data": [1, 2]}
+        assert api._split_message(channel, msg) == [("DUMMY_BTCUSDT", msg)]
+
+    def test_default_without_channel_has_no_product(self, api: DummyWebSocketAPI):
+        msg = {"success": False}
+        assert api._split_message(None, msg) == [(None, msg)]
+
+    def test_one_message_per_split(self):
+        api, received = connected_split_api()
+        asyncio.run(run(api, Server([kline(1, 2)]), until=lambda: len(received) == 2))
+        assert [(m["product"], m["data"], m["message"]) for m in received] == [
+            ("P1", [10], {"topic": KLINE, "data": [1]}),
+            ("P2", [20], {"topic": KLINE, "data": [2]}),
+        ]
+        assert all(m["channel"] == KLINE and m["resolution"] == "1m" for m in received)
+
+    def test_empty_split_drops_the_message(self):
+        api, received = connected_split_api()
+        asyncio.run(run(api, Server([kline(0), kline(3)]), until=lambda: len(received) == 1))
+        assert [m["product"] for m in received] == ["P3"]
+
+    def test_split_without_parsing(self):
+        api, received = connected_split_api(skip_parse_message=True)
+        asyncio.run(run(api, Server([kline(1, 2)]), until=lambda: len(received) == 2))
+        assert [(m["product"], m["data"], m["message"]) for m in received] == [
+            ("P1", None, {"topic": KLINE, "data": [1]}),
+            ("P2", None, {"topic": KLINE, "data": [2]}),
+        ]
 
 
 class TestReconnect:

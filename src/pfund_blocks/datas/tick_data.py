@@ -13,6 +13,7 @@ from msgspec import Meta
 
 from pfund_blocks.datas.data_point_base import BaseDataPoint
 from pfund_blocks.datas.market_data import MarketData
+from pfund_blocks.enums.side import Side
 from pfund_blocks.utils.temporal import ns_to_dt
 
 
@@ -23,6 +24,7 @@ class Tick(BaseDataPoint, kw_only=True, frozen=True):
     # NOTE: price is not bound to > 0 on purpose, it can be zero or negative, e.g. WTI futures in 2020, calendar spreads
     price: float
     volume: float
+    side: Side | None = None  # the taker's side, None if the venue doesn't provide it
 
     def __post_init__(self):
         if self.volume < 0:

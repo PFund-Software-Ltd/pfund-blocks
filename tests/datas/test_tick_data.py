@@ -9,6 +9,7 @@ import pytest
 from pfund_blocks.datas.bar_data import BarData
 from pfund_blocks.datas.tick_data import Tick, TickData
 from pfund_blocks.entities.products.product_base import BaseProduct
+from pfund_blocks.enums.side import Side
 from pfund_blocks.resolution import Resolution
 from pfund_blocks.utils.temporal import NS_PER_SECOND
 
@@ -57,6 +58,17 @@ class TestTick:
     def test_serialization_round_trip(self):
         tick = create_tick()
         assert msgspec.json.decode(msgspec.json.encode(tick), type=Tick) == tick
+
+    def test_side_is_optional(self):
+        assert create_tick().side is None
+
+    def test_side_round_trip(self):
+        tick = Tick(ts=T0, price=100.0, volume=1.0, side=Side.SELL)
+        assert msgspec.json.decode(msgspec.json.encode(tick), type=Tick).side == Side.SELL
+
+    def test_invalid_side_raises(self):
+        with pytest.raises(msgspec.ValidationError, match="side"):
+            msgspec.convert({"ts": T0, "price": 100.0, "volume": 1.0, "side": 0}, Tick)
 
     def test_decoding_a_ts_in_seconds_raises(self):
         data = {

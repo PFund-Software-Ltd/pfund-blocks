@@ -90,5 +90,5 @@ class Message(TypedDict):
     resolution: str | None  # e.g. "1m", None if the message is not market data
     received_at: int  # int64 ns since epoch when the message was received
     message: DecodedMessage | None  # the venue's decoded but unparsed message, None if opted out
-    data: ParsedMessage | None  # None if not parsed or an error
+    data: ParsedMessage | None  # parsed by parser, None if not parsed or an error
     error: str | None  # the venue's error, e.g. a rejected subscription, None if not an error

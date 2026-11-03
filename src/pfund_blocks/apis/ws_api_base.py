@@ -215,10 +215,21 @@ class BaseWebSocketAPI[AccountT: BaseAccount = BaseAccount](ABC):
         """
         ...
 
-    async def _dispatch_message(self, message: Message) -> None:
-        """Passes the message to the callback.
-        Override it to e.g. unwrap a venue's message of many products into one message per product.
+    def _split_message(self, full_channel: FullChannel | None, msg: DecodedMessage) -> list[tuple[ProductName | None, DecodedMessage]]:
+        """Splits the decoded message into one message per product, before it is parsed.
+
+        Override it for a channel of many products, e.g. Bybit's option trades are streamed per base coin.
+        It runs before parsing, since the parsed data may no longer have each item's product, e.g. a Tick has no symbol.
+
+        Returns:
+            (product, decoded message) pairs, one Message is created per pair, an empty list drops the message.
+            By default, the message as is with its channel's product.
         """
+        channel_info = self._channel_infos.get(full_channel) if full_channel else None
+        return [(channel_info.product if channel_info else None, msg)]
+
+    async def _dispatch_message(self, message: Message) -> None:
+        """Passes the message to the callback."""
         if self._callback is None:
             return
         if inspect.isawaitable(ret := self._callback(message)):
@@ -342,22 +353,23 @@ class BaseWebSocketAPI[AccountT: BaseAccount = BaseAccount](ABC):
                             continue
                         full_channel, msg = result
                         error = self.parser.parse_message_error(full_channel, msg)
-                        data = None
-                        if not self._skip_parse_message and full_channel and error is None:
-                            data = self.parser.parse_message(full_channel, msg)
                         channel_info = self._channel_infos.get(full_channel) if full_channel else None
-                        message: Message = {
-                            "source": self.venue,
-                            "account": account.name if account else None,
-                            "channel": full_channel,
-                            "product": channel_info.product if channel_info else None,
-                            "resolution": channel_info.resolution if channel_info else None,
-                            "received_at": received_at,
-                            "message": msg if self._include_raw_message else None,
-                            "data": data,
-                            "error": error,
-                        }
-                        await self._dispatch_message(message)
+                        for product, product_msg in self._split_message(full_channel, msg):
+                            data = None
+                            if not self._skip_parse_message and full_channel and error is None:
+                                data = self.parser.parse_message(full_channel, product_msg)
+                            message: Message = {
+                                "source": self.venue,
+                                "account": account.name if account else None,
+                                "channel": full_channel,
+                                "product": product,
+                                "resolution": channel_info.resolution if channel_info else None,
+                                "received_at": received_at,
+                                "message": product_msg if self._include_raw_message else None,
+                                "data": data,
+                                "error": error,
+                            }
+                            await self._dispatch_message(message)
                     except Exception:
                         # one bad message shouldn't kill the stream
                         self._logger.exception(f"{ws_name} failed to handle message {raw_msg!r}")
