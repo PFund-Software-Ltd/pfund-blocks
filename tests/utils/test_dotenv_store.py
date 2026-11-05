@@ -41,11 +41,11 @@ class TestLoading:
     def test_finds_env_file_in_parent_dir(
         self, cwd: Path, monkeypatch: pytest.MonkeyPatch
     ):
-        (cwd / ".env.sandbox").write_text("KEY=parent\n")
+        (cwd / ".env.paper").write_text("KEY=parent\n")
         subdir = cwd / "a" / "b"
         subdir.mkdir(parents=True)
         monkeypatch.chdir(subdir)
-        assert DotenvStore(env="sandbox").get("KEY") == "parent"
+        assert DotenvStore(env="paper").get("KEY") == "parent"
 
     def test_missing_env_file_loads_nothing(self, cwd: Path):
         store = DotenvStore(env="paper")
