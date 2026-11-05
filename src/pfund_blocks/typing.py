@@ -10,6 +10,8 @@ if TYPE_CHECKING:
 from dataclasses import dataclass, field
 
 type ProductName = str
+type ResolutionRepr = str  # repr(Resolution), e.g. "1m", "1t", "1q_L1"
+type ResolutionStr = str  # str(Resolution), e.g. "1_MINUTE", "1_TICK", "1_QUOTE_L1"
 type EndpointName = str  # also the REST API function name, e.g. "get_markets"
 type AccountName = str
 type FullChannel = str
@@ -87,7 +89,7 @@ class Message(TypedDict):
     account: AccountName | None  # None for public messages
     channel: FullChannel | None  # the subscribed channel, e.g. "kline.1.BTCUSDT", None if unknown, e.g. an error
     product: ProductName | None  # None if the message is not for a single product, e.g. balances
-    resolution: str | None  # e.g. "1m", None if the message is not market data
+    resolution: ResolutionRepr | None  # e.g. "1m", None if the message is not market data
     received_at: int  # int64 ns since epoch when the message was received
     message: DecodedMessage | None  # the venue's decoded but unparsed message, None if opted out
     data: ParsedMessage | None  # parsed by parser, None if not parsed or an error
