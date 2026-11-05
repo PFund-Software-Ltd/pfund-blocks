@@ -368,6 +368,7 @@ class BaseWebSocketAPI[AccountT: BaseAccount = BaseAccount](ABC):
                                 "message": product_msg if self._include_raw_message else None,
                                 "data": data,
                                 "error": error,
+                                "extra": {},
                             }
                             await self._dispatch_message(message)
                     except Exception:

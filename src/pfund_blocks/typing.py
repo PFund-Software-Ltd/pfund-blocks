@@ -94,3 +94,4 @@ class Message(TypedDict):
     message: DecodedMessage | None  # the venue's decoded but unparsed message, None if opted out
     data: ParsedMessage | None  # parsed by parser, None if not parsed or an error
     error: str | None  # the venue's error, e.g. a rejected subscription, None if not an error
+    extra: dict[str, Any]  # fields added after receiving, e.g. by a user's transformation, empty when received
