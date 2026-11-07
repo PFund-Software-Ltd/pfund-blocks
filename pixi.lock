@@ -52,7 +52,6 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/ca-certificates-2026.7.22-hbd8a1cb_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/python_abi-3.13-9_cp313.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/tzdata-2026c-h151e31d_0.conda
-      - pypi: ../../afterpython.org/afterpython
       - pypi: ./
       - pypi: https://files.pythonhosted.org/packages/04/4b/29cac41a4d98d144bf5f6d33995617b185d14b22401f75ca86f384e87ff1/h11-0.16.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/12/b8/4bd346e22b28902df4d651910f5242c28d84e4a5c2435ca5c3f797ed7e2e/anyio-4.15.1-py3-none-any.whl
@@ -78,6 +77,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/54/c8/12811c9b48fde162bb72b6f2e78fada9a247a09d7bb5be2050a5d099c77b/nodeenv-1.11.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/56/43/4ca9e49d27a1fcf6bece6f6aec0ea46bb9112489b93d4b688fb415457bdb/iniconfig-2.3.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/58/a2/bb081bab032533a855d44de1d56f8e8426114ff1ba5d1f07a438a0a654f8/idna-3.20-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/5e/b6/5b3f15489c34dd70ad07550b061564c23d46cbbd417671358361fe717f39/afterpython-0.4.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/60/d1/38f3a3405989a89ac18390803e70c6ad7c7760da4f9b83cbeca0c44a0c72/python_dotenv-1.2.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/62/a1/3d680cbfd5f4b8f15abc1d571870c5fc3e594bb582bc3b64ea099db13e56/jinja2-3.1.6-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/63/34/ba1c580383c9eada3711951fef0795c80b829a078d72188184bcab9dd527/packaging-26.3-py3-none-any.whl
@@ -142,7 +142,6 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/ca-certificates-2026.7.22-hbd8a1cb_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/python_abi-3.13-9_cp313.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/tzdata-2026c-h151e31d_0.conda
-      - pypi: ../../afterpython.org/afterpython
       - pypi: ./
       - pypi: https://files.pythonhosted.org/packages/04/4b/29cac41a4d98d144bf5f6d33995617b185d14b22401f75ca86f384e87ff1/h11-0.16.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/11/14/58374587e973223a370bdf3cd6298936e8d43594c25458613c92ac0d86ac/prek-0.5.10-py3-none-manylinux_2_28_aarch64.whl
@@ -169,6 +168,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/56/43/4ca9e49d27a1fcf6bece6f6aec0ea46bb9112489b93d4b688fb415457bdb/iniconfig-2.3.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/58/a2/bb081bab032533a855d44de1d56f8e8426114ff1ba5d1f07a438a0a654f8/idna-3.20-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/58/de/a392dc38b215798ae72e639d228b7f6c02d826a95d1c0ad7c4c0ee49ef5b/ruff-0.17.4-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl
+      - pypi: https://files.pythonhosted.org/packages/5e/b6/5b3f15489c34dd70ad07550b061564c23d46cbbd417671358361fe717f39/afterpython-0.4.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/60/d1/38f3a3405989a89ac18390803e70c6ad7c7760da4f9b83cbeca0c44a0c72/python_dotenv-1.2.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/62/a1/3d680cbfd5f4b8f15abc1d571870c5fc3e594bb582bc3b64ea099db13e56/jinja2-3.1.6-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/63/34/ba1c580383c9eada3711951fef0795c80b829a078d72188184bcab9dd527/packaging-26.3-py3-none-any.whl
@@ -226,7 +226,6 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/python-3.13.16-hb59dee6_101_cp313.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/readline-8.3-h8b90a29_1.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/tk-8.6.13-hbeba79b_4.conda
-      - pypi: ../../afterpython.org/afterpython
       - pypi: ./
       - pypi: https://files.pythonhosted.org/packages/04/4b/29cac41a4d98d144bf5f6d33995617b185d14b22401f75ca86f384e87ff1/h11-0.16.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/04/e9/dfdca30ca36c472de3e260406dee29fc108499ec590c63b3fe279887ee9d/wcwidth-0.9.4-cp310-abi3-macosx_11_0_arm64.whl
@@ -253,6 +252,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/56/43/4ca9e49d27a1fcf6bece6f6aec0ea46bb9112489b93d4b688fb415457bdb/iniconfig-2.3.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/57/71/a097d6552f837500fc36e6b23d09cfb9890c3cc47531f9ca64e149799615/rpds_py-2026.9.1-cp313-cp313-macosx_11_0_arm64.whl
       - pypi: https://files.pythonhosted.org/packages/58/a2/bb081bab032533a855d44de1d56f8e8426114ff1ba5d1f07a438a0a654f8/idna-3.20-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/5e/b6/5b3f15489c34dd70ad07550b061564c23d46cbbd417671358361fe717f39/afterpython-0.4.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/60/d1/38f3a3405989a89ac18390803e70c6ad7c7760da4f9b83cbeca0c44a0c72/python_dotenv-1.2.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/62/a1/3d680cbfd5f4b8f15abc1d571870c5fc3e594bb582bc3b64ea099db13e56/jinja2-3.1.6-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/63/34/ba1c580383c9eada3711951fef0795c80b829a078d72188184bcab9dd527/packaging-26.3-py3-none-any.whl
@@ -311,7 +311,6 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/vc-14.5-ha367084_41.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/vc14_runtime-14.51.36247-habf1de7_41.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/vcomp14-14.51.36247-habf1de7_41.conda
-      - pypi: ../../afterpython.org/afterpython
       - pypi: ./
       - pypi: https://files.pythonhosted.org/packages/01/33/e591f9d3d8d6c9cfc02ae95f3e3c44920f2d18050f3f252c244e0f293a0e/msgspec-0.22.0-cp313-cp313-win_amd64.whl
       - pypi: https://files.pythonhosted.org/packages/04/4b/29cac41a4d98d144bf5f6d33995617b185d14b22401f75ca86f384e87ff1/h11-0.16.0-py3-none-any.whl
@@ -338,6 +337,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/54/c8/12811c9b48fde162bb72b6f2e78fada9a247a09d7bb5be2050a5d099c77b/nodeenv-1.11.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/56/43/4ca9e49d27a1fcf6bece6f6aec0ea46bb9112489b93d4b688fb415457bdb/iniconfig-2.3.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/58/a2/bb081bab032533a855d44de1d56f8e8426114ff1ba5d1f07a438a0a654f8/idna-3.20-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/5e/b6/5b3f15489c34dd70ad07550b061564c23d46cbbd417671358361fe717f39/afterpython-0.4.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/60/d1/38f3a3405989a89ac18390803e70c6ad7c7760da4f9b83cbeca0c44a0c72/python_dotenv-1.2.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/62/a1/3d680cbfd5f4b8f15abc1d571870c5fc3e594bb582bc3b64ea099db13e56/jinja2-3.1.6-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/63/34/ba1c580383c9eada3711951fef0795c80b829a078d72188184bcab9dd527/packaging-26.3-py3-none-any.whl
@@ -2443,33 +2443,12 @@ packages:
     - zstd >=1.5.7,<1.6.0a0
   size: 387535
   timestamp: 1786599623274
-- pypi: ../../afterpython.org/afterpython
-  name: afterpython
-  requires_dist:
-  - click>=8.5.1
-  - trogon>=0.6.0
-  - httpx2>=2.16.0
-  - tomlkit>=0.15.2
-  - ruamel-yaml>=0.19.1
-  - gitpython>=3.2.1
-  - python-dotenv>=1.2.4
-  - pyproject-metadata>=0.12.1
-  - jupytext>=1.19.6
-  - mystmd>=1.12.0
-  - pdoc>=16.0.0
-  - ruff>=0.17.4
-  - prek>=0.5.10
-  - ty>=0.0.99
-  - git-cliff>=2.14.2
-  - questionary>=2.1.1
-  - marimo[recommended,lsp]>=0.25.2 ; extra == 'marimo'
-  requires_python: '>=3.13'
 - pypi: ./
   name: pfund-blocks
   requires_dist:
   - python-dotenv>=1.2.4
   - httpx2[http2]>=2.16.0
-  - websockets>=16.1.1
+  - websockets>=16.1.1 ; sys_platform != 'emscripten'
   - msgspec>=0.20.0
   - pydantic>=2.12.5
   requires_python: '>=3.13'
@@ -2843,6 +2822,29 @@ packages:
   version: 0.17.4
   sha256: 8ea6e0017c785f7282092b11e46338e4ebed1b9e575ebf2e55a8a1eda968241a
   requires_python: '>=3.7'
+- pypi: https://files.pythonhosted.org/packages/5e/b6/5b3f15489c34dd70ad07550b061564c23d46cbbd417671358361fe717f39/afterpython-0.4.1-py3-none-any.whl
+  name: afterpython
+  version: 0.4.1
+  sha256: dca0e391b0cf32fd9a1a47cccbfdf5bb32433859244e39858f5761ca9ffe4367
+  requires_dist:
+  - click>=8.5.1
+  - trogon>=0.6.0
+  - httpx2>=2.16.0
+  - tomlkit>=0.15.2
+  - ruamel-yaml>=0.19.1
+  - gitpython>=3.2.1
+  - python-dotenv>=1.2.4
+  - pyproject-metadata>=0.12.1
+  - jupytext>=1.19.6
+  - mystmd>=1.12.0
+  - pdoc>=16.0.0
+  - ruff>=0.17.4
+  - prek>=0.5.10
+  - ty>=0.0.99
+  - git-cliff>=2.14.2
+  - questionary>=2.1.1
+  - marimo[recommended,lsp]>=0.25.2 ; extra == 'marimo'
+  requires_python: '>=3.13'
 - pypi: https://files.pythonhosted.org/packages/5f/98/f9bd7e1f9b6709f155acb9ef826d9c3884fe925f811fd8e55b9b52280bad/pydantic_core-2.50.1-cp315-cp315-win_amd64.whl
   name: pydantic-core
   version: 2.50.1
