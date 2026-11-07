@@ -3,13 +3,12 @@ authors = ["softwareentrepreneer <softwareentrepreneer+pfund-blocks@gmail.com>"]
 channels = ["conda-forge"]
 name = "pfund-blocks"
 platforms = ["osx-arm64", "linux-aarch64", "linux-64", "win-64"]
-requires-pixi = ">=0.83.0"
+requires-pixi = ">=0.84.1"
 # FIXME: set it back to "14 days" when the package is stable
 exclude-newer = "0d"
 
-[pypi-exclude-newer]
-afterpython = "0d"
-uv_build = "0d"
+[workspace.pypi-exclude-newer]
+exemptions = { afterpython = "*", uv_build = "*" }
 
 [tasks]
 
@@ -26,8 +25,8 @@ depends-on = [
 python-dotenv = ">=1.2.4"
 httpx2 = { version = ">=2.16.0", extras = ["http2"] }
 websockets = ">=16.1.1"
-msgspec = ">=0.22.0"
-pydantic = ">=2.14.1"
+msgspec = ">=0.20.0"
+pydantic = ">=2.12.5"
 
 [environments]
 default = ["py313", "dev", "test"]
@@ -37,8 +36,7 @@ py315 = ["py315", "test"]
 
 [feature.dev.pypi-dependencies]
 pfund-blocks = { path = ".", editable = true }
-afterpython = { path ="../../afterpython.org/afterpython", editable = true }  # TEMP
-# afterpython = ">=0.4.0"
+afterpython = ">=0.4.1"
 
 [feature.test.pypi-dependencies]
 pfund-blocks = { path = ".", editable = true }
