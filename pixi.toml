@@ -36,11 +36,11 @@ py315 = ["py315", "test"]
 
 [feature.dev.pypi-dependencies]
 pfund-blocks = { path = ".", editable = true }
-afterpython = ">=0.4.1"
+afterpython = ">=0.4.6"
 
 [feature.test.pypi-dependencies]
 pfund-blocks = { path = ".", editable = true }
-pytest = ">=9.1.1"
+pytest = ">=9.2.0"
 pytest-mock = ">=3.17.0"
 pytest-xdist = ">=3.8.0"
 [feature.test.tasks]
