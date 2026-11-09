@@ -1,13 +1,14 @@
-from __future__ import annotations
-
+# NOTE: no `from __future__ import annotations` here, the classes below must hold real types, not strings.
+# Otherwise msgspec on Python 3.14 resolves the inherited string annotations of a TypedDict subclass
+# (e.g. pfeed's MarketDataMessage(Message)) in the subclass's module, raising NameError for e.g. AccountName.
 from typing import TYPE_CHECKING, Any, NamedTuple, TypedDict
 
 if TYPE_CHECKING:
-    from http import HTTPMethod
-
+    # only used in a lazy `type` alias, so it can stay typing-only
     from pfund_blocks.entities.markets.market_base import MarketDict
 
 from dataclasses import dataclass, field
+from http import HTTPMethod
 
 type ProductName = str
 type ResolutionRepr = str  # repr(Resolution), e.g. "1m", "1t", "1q_L1"
