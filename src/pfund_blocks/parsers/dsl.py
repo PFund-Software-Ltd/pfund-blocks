@@ -75,10 +75,9 @@ Example
 
 from __future__ import annotations
 
-from typing import Any, overload
-
 import reprlib
 from collections.abc import Callable, Sequence
+from typing import Any, overload
 
 type Step = str | Callable[[Any], Any]
 type Path = Sequence[Step]
@@ -92,8 +91,12 @@ class SchemaParseError(Exception):
 @overload
 def parse_schema(payload: dict[str, Any], schema: Schema) -> dict[str, Any]: ...
 @overload
-def parse_schema(payload: list[dict[str, Any]], schema: Schema) -> list[dict[str, Any]]: ...
-def parse_schema(payload: dict[str, Any] | list[dict[str, Any]], schema: Schema) -> dict[str, Any] | list[dict[str, Any]]:
+def parse_schema(
+    payload: list[dict[str, Any]], schema: Schema
+) -> list[dict[str, Any]]: ...
+def parse_schema(
+    payload: dict[str, Any] | list[dict[str, Any]], schema: Schema
+) -> dict[str, Any] | list[dict[str, Any]]:
     """Converts a payload into standardized data according to the schema (see the module docstring)."""
     return _convert(payload, schema, loc="")
 
@@ -109,7 +112,9 @@ def _convert(payload: Any, schema: Schema, loc: str) -> Any:
         for i, item in enumerate(payload):
             item_loc = f"{loc}[{i}]"
             if not isinstance(item, dict):
-                raise SchemaParseError(f"{item_loc}: expected a dict, got {type(item).__name__}: {reprlib.repr(item)}")
+                raise SchemaParseError(
+                    f"{item_loc}: expected a dict, got {type(item).__name__}: {reprlib.repr(item)}"
+                )
             output.append(_parse(item, schema, item_loc))
         return output
     else:
@@ -129,7 +134,9 @@ def _step_name(step: Callable[[Any], Any]) -> str:
 
 def _path_repr(path: Path) -> str:
     """e.g. ('priceFilter', 'tickSize') -> ("priceFilter", "tickSize"), ('price', float) -> ("price", float)"""
-    names = [f'"{step}"' if isinstance(step, str) else _step_name(step) for step in path]
+    names = [
+        f'"{step}"' if isinstance(step, str) else _step_name(step) for step in path
+    ]
     return f"({', '.join(names)}{',' if len(names) == 1 else ''})"
 
 
@@ -143,7 +150,9 @@ def _walk(value: Any, path: Path, loc: str) -> Any:
             if value is None:
                 return None
         elif isinstance(step, dict):
-            raise SchemaParseError(f"{loc}: {_path_repr(path)} has a dict as a path step, use a nested schema instead")
+            raise SchemaParseError(
+                f"{loc}: {_path_repr(path)} has a dict as a path step, use a nested schema instead"
+            )
         else:
             try:
                 value = step(value)
@@ -160,7 +169,9 @@ def _parse(msg: dict[str, Any], schema: Schema, loc: str) -> dict[str, Any]:
         field_loc = f"{loc}.{key}" if loc else key
         if key.startswith("@"):
             if not isinstance(schema.get(key[1:]), dict):
-                raise SchemaParseError(f'{field_loc}: "{key}" has no nested schema "{key[1:]}"')
+                raise SchemaParseError(
+                    f'{field_loc}: "{key}" has no nested schema "{key[1:]}"'
+                )
             continue
         # Case 1: path
         if isinstance(rule, (list, tuple)):
@@ -169,7 +180,9 @@ def _parse(msg: dict[str, Any], schema: Schema, loc: str) -> dict[str, Any]:
         elif isinstance(rule, dict):
             source_key = f"@{key}"
             if source_key not in schema:
-                raise SchemaParseError(f'{field_loc}: nested schema "{key}" has no "{source_key}" path')
+                raise SchemaParseError(
+                    f'{field_loc}: nested schema "{key}" has no "{source_key}" path'
+                )
             source_loc = f"{loc}.{source_key}" if loc else source_key
             source = _walk(msg, schema[source_key], source_loc)
             output[key] = None if source is None else _convert(source, rule, field_loc)

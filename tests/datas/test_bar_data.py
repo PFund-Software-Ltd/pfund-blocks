@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from typing import Any
-
 import pickle
 from datetime import UTC, datetime
+from typing import Any
 
 import msgspec
 import pytest
@@ -128,9 +127,7 @@ class TestGetBarWindow:
             ("2d", "1d", DAY),
         ],
     )
-    def test_shift_is_a_duration(
-        self, resolution: str, shift: str, shift_ns: int
-    ):
+    def test_shift_is_a_duration(self, resolution: str, shift: str, shift_ns: int):
         resolution_ = Resolution(resolution)
         duration = resolution_.to_seconds() * SECOND
         assert get_bar_window(T0 + shift_ns, resolution_, shift) == (
@@ -151,7 +148,15 @@ class TestGetBarWindow:
 
     @pytest.mark.parametrize(
         "resolution, shift",
-        [("1m", "1m"), ("1m", "60s"), ("1h", "1h"), ("1d", "24h"), ("4h", "4h"), ("4h", "5h"), ("2d", "2d")],
+        [
+            ("1m", "1m"),
+            ("1m", "60s"),
+            ("1h", "1h"),
+            ("1d", "24h"),
+            ("4h", "4h"),
+            ("4h", "5h"),
+            ("2d", "2d"),
+        ],
     )
     def test_shift_of_one_bar_or_more_raises(self, resolution: str, shift: str):
         with pytest.raises(ValueError, match="shorter than one"):
@@ -161,7 +166,9 @@ class TestGetBarWindow:
         "resolution, shift",
         [("1h", "30s"), ("4h", "90s"), ("1d", "30m"), ("1d", "90m")],
     )
-    def test_shift_not_in_whole_next_smaller_units_raises(self, resolution: str, shift: str):
+    def test_shift_not_in_whole_next_smaller_units_raises(
+        self, resolution: str, shift: str
+    ):
         with pytest.raises(ValueError, match="must be whole"):
             get_bar_window(T0, Resolution(resolution), shift)
 
@@ -171,9 +178,14 @@ class TestGetBarWindow:
             get_bar_window(T0, Resolution("1h"), shift)
 
     def test_largest_shift_is_allowed(self):
-        assert get_bar_window(T0, Resolution("1m"), "59s")[0] == T0 - MINUTE + 59 * SECOND
+        assert (
+            get_bar_window(T0, Resolution("1m"), "59s")[0] == T0 - MINUTE + 59 * SECOND
+        )
         assert get_bar_window(T0, Resolution("1d"), "23h")[0] == T0 - DAY + 23 * HOUR
-        assert get_bar_window(T0, Resolution("4h"), "239m")[0] == T0 - 4 * HOUR + 239 * MINUTE
+        assert (
+            get_bar_window(T0, Resolution("4h"), "239m")[0]
+            == T0 - 4 * HOUR + 239 * MINUTE
+        )
 
 
 class TestBar:
@@ -305,7 +317,9 @@ class TestBarDataIdentity:
 
     def test_same_shift_written_differently_is_equal(self):
         assert create_data("4h", shift="2h") == create_data("4h", shift="120m")
-        assert len({create_data("4h", shift="2h"), create_data("4h", shift="120m")}) == 1
+        assert (
+            len({create_data("4h", shift="2h"), create_data("4h", shift="120m")}) == 1
+        )
 
     def test_other_type_is_not_equal(self):
         assert create_data() != "5m"
@@ -389,7 +403,12 @@ class TestBindResampler:
             ("5m", "30s", "1m", ""),  # 1m bars don't start 30 seconds late
             ("5m", "", "1m", "30s"),  # the other way around
             ("1h", "7m", "5m", ""),  # 5m bars don't start at minute 7
-            ("1h", "30m", "1m", "30s"),  # 1m bars start at second 30, the 1h bar at second 0
+            (
+                "1h",
+                "30m",
+                "1m",
+                "30s",
+            ),  # 1m bars start at second 30, the 1h bar at second 0
             ("4h", "90m", "1h", ""),  # 1h bars don't start at 01:30
         ],
     )
@@ -492,17 +511,31 @@ class TestCanResampleFrom:
     @pytest.mark.parametrize(
         ("data_shift", "resolution", "resampler_shift", "expected"),
         [
-            ("30s", "1m", "", False),  # unshifted 1m bars don't start with 5m bars with shift='30s'
+            (
+                "30s",
+                "1m",
+                "",
+                False,
+            ),  # unshifted 1m bars don't start with 5m bars with shift='30s'
             ("30s", "1m", "30s", True),  # both start 30 seconds into the minute
             ("", "1m", "30s", False),
-            ("2m", "1m", "", True),  # 5m bars shifted by whole minutes still start with unshifted 1m bars
+            (
+                "2m",
+                "1m",
+                "",
+                True,
+            ),  # 5m bars shifted by whole minutes still start with unshifted 1m bars
             ("90s", "1m", "", False),  # 1.5 minutes is not on a 1m boundary
             ("30s", "1t", "", True),  # a tick has no window, so a shift doesn't matter
         ],
     )
-    def test_shift(self, data_shift: str, resolution: str, resampler_shift: str, expected: bool):
+    def test_shift(
+        self, data_shift: str, resolution: str, resampler_shift: str, expected: bool
+    ):
         data = create_data("5m", shift=data_shift)
-        assert data.can_resample_from(Resolution(resolution), resampler_shift) is expected
+        assert (
+            data.can_resample_from(Resolution(resolution), resampler_shift) is expected
+        )
 
     def test_invalid_shift_raises(self):
         with pytest.raises(ValueError, match="shift"):
@@ -515,7 +548,8 @@ class TestCanResampleFrom:
         assert not m5.is_resamplee()
 
     @pytest.mark.parametrize(
-        ("resamplee", "resampler"), [("5m", "1m"), ("6m", "3m"), ("6m", "5m"), ("5m", "3m"), ("1h", "1m")]
+        ("resamplee", "resampler"),
+        [("5m", "1m"), ("6m", "3m"), ("6m", "5m"), ("5m", "3m"), ("1h", "1m")],
     )
     def test_agrees_with_bind_resampler(self, resamplee: str, resampler: str):
         data = create_data(resamplee)

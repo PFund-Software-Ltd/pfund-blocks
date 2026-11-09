@@ -18,7 +18,10 @@ from pfund_blocks.typing import Endpoint, Request
 
 class DummyRestAPI(BaseRestAPI):
     venue: ClassVar[str] = "DUMMY"
-    urls = {Environment.PAPER: "https://paper.dummy", Environment.LIVE: "https://live.dummy"}  # noqa: RUF012
+    urls = {  # noqa: RUF012
+        Environment.PAPER: "https://paper.dummy",
+        Environment.LIVE: "https://live.dummy",
+    }
     public_endpoints = {"get_markets": Endpoint(HTTPMethod.GET, "/markets")}  # noqa: RUF012
     private_endpoints = {"place_order": Endpoint(HTTPMethod.POST, "/order")}  # noqa: RUF012
 
@@ -36,19 +39,31 @@ class TestGetEndpoint:
         assert api.get_endpoint("place_order") == Endpoint(HTTPMethod.POST, "/order")
 
     def test_unregistered_raises(self, api: DummyRestAPI):
-        with pytest.raises(ValueError, match='"get_trades" is not a registered endpoint'):
+        with pytest.raises(
+            ValueError, match='"get_trades" is not a registered endpoint'
+        ):
             api.get_endpoint("get_trades")
 
 
 class TestCreateRequest:
     def test_public(self, api: DummyRestAPI):
-        assert api._create_request("get_markets", params={"category": "spot"}) == Request(
-            name="get_markets", method=HTTPMethod.GET, path="/markets", params={"category": "spot"}, private=False
+        assert api._create_request(
+            "get_markets", params={"category": "spot"}
+        ) == Request(
+            name="get_markets",
+            method=HTTPMethod.GET,
+            path="/markets",
+            params={"category": "spot"},
+            private=False,
         )
 
     def test_private(self, api: DummyRestAPI):
         assert api._create_request("place_order", body={"qty": "1"}) == Request(
-            name="place_order", method=HTTPMethod.POST, path="/order", body={"qty": "1"}, private=True
+            name="place_order",
+            method=HTTPMethod.POST,
+            path="/order",
+            body={"qty": "1"},
+            private=True,
         )
 
     def test_unregistered_raises(self, api: DummyRestAPI):
@@ -59,7 +74,9 @@ class TestCreateRequest:
 class TestSend:
     @staticmethod
     def _send(api: DummyRestAPI, response: httpx2.Response) -> Reply:
-        api._client = httpx2.AsyncClient(transport=httpx2.MockTransport(lambda request: response))
+        api._client = httpx2.AsyncClient(
+            transport=httpx2.MockTransport(lambda request: response)
+        )
         return asyncio.run(api.send(api._create_request("get_markets")))
 
     def test_json_response(self, api: DummyRestAPI):
@@ -91,7 +108,12 @@ class TestSend:
 
 class TestInitSubclass:
     def test_endpoint_in_both_tables_raises(self):
-        with pytest.raises(ValueError, match=r"both public_endpoints and private_endpoints: \['get_markets'\]"):
+        with pytest.raises(
+            ValueError,
+            match=r"both public_endpoints and private_endpoints: \['get_markets'\]",
+        ):
 
             class _BadRestAPI(DummyRestAPI):
-                private_endpoints = {"get_markets": Endpoint(HTTPMethod.GET, "/markets")}  # noqa: RUF012
+                private_endpoints = {  # noqa: RUF012
+                    "get_markets": Endpoint(HTTPMethod.GET, "/markets")
+                }

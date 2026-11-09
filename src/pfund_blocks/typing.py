@@ -78,7 +78,9 @@ class Reply(TypedDict):
     account: str | None  # account name, None for public requests
     request: RequestData
     status_code: int | None  # None if no response is received
-    received_at: int | None  # int64 ns since epoch when the response was received, None if not received
+    received_at: (
+        int | None
+    )  # int64 ns since epoch when the response was received, None if not received
     response: RawResponse | None  # None if no response is received
     data: ParsedResponse | None  # None if not parsed
 
@@ -88,11 +90,23 @@ class Message(TypedDict):
 
     source: str  # a trading venue (e.g. BYBIT) or a data source (e.g. YAHOO_FINANCE)
     account: AccountName | None  # None for public messages
-    channel: FullChannel | None  # the subscribed channel, e.g. "kline.1.BTCUSDT", None if unknown, e.g. an error
-    product: ProductName | None  # None if the message is not for a single product, e.g. balances
-    resolution: ResolutionRepr | None  # e.g. "1m", None if the message is not market data
+    channel: (
+        FullChannel | None
+    )  # the subscribed channel, e.g. "kline.1.BTCUSDT", None if unknown, e.g. an error
+    product: (
+        ProductName | None
+    )  # None if the message is not for a single product, e.g. balances
+    resolution: (
+        ResolutionRepr | None
+    )  # e.g. "1m", None if the message is not market data
     received_at: int  # int64 ns since epoch when the message was received
-    message: DecodedMessage | None  # the venue's decoded but unparsed message, None if opted out
+    message: (
+        DecodedMessage | None
+    )  # the venue's decoded but unparsed message, None if opted out
     data: ParsedMessage | None  # parsed by parser, None if not parsed or an error
-    error: str | None  # the venue's error, e.g. a rejected subscription, None if not an error
-    extra: dict[str, Any]  # fields added after receiving, e.g. by a user's transformation, empty when received
+    error: (
+        str | None
+    )  # the venue's error, e.g. a rejected subscription, None if not an error
+    extra: dict[
+        str, Any
+    ]  # fields added after receiving, e.g. by a user's transformation, empty when received

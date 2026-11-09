@@ -23,7 +23,9 @@ type QuoteLevel = tuple[Price, Size]
 class Quote(BaseDataPoint, kw_only=True, frozen=True):
     """A snapshot of the bids and asks in the market, best price first."""
 
-    ts: Annotated[int, Meta(gt=10_000_000_000)]  # when the quote was made, int64 ns since epoch
+    ts: Annotated[
+        int, Meta(gt=10_000_000_000)
+    ]  # when the quote was made, int64 ns since epoch
     # NOTE: price is not bound to > 0 on purpose, it can be zero or negative, e.g. WTI futures in 2020, calendar spreads
     bids: tuple[QuoteLevel, ...]
     asks: tuple[QuoteLevel, ...]

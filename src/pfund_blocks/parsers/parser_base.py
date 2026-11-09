@@ -34,11 +34,17 @@ class BaseParser:
         def parse_fix(self, name, response): return self._parse(self.fix_api, name, response)
     """
 
-    adapter: ClassVar[BaseAdapter[Any]]  # maps the venue's values to pfund's, e.g. adapter = BybitAdapter()
-    rest_api: ClassVar[dict[EndpointName, str]] = {}  # REST API function name -> parsing method name
+    adapter: ClassVar[
+        BaseAdapter[Any]
+    ]  # maps the venue's values to pfund's, e.g. adapter = BybitAdapter()
+    rest_api: ClassVar[
+        dict[EndpointName, str]
+    ] = {}  # REST API function name -> parsing method name
     ws_api: ClassVar[dict[Channel, str]] = {}  # Channel -> parsing method name
 
-    parse_schema = staticmethod(parse_schema)  # helper for parsing methods to convert a response by a DSL schema, see parsers/dsl.py
+    parse_schema = staticmethod(
+        parse_schema
+    )  # helper for parsing methods to convert a response by a DSL schema, see parsers/dsl.py
 
     def _parse[K: str](self, table: dict[K, str], name: K, response: Any) -> Any:
         """Parses the response with the parsing method mapped to `name` in `table`.
@@ -50,26 +56,38 @@ class BaseParser:
             return None
         return getattr(self, table[name])(response)
 
-    def parse_response(self, name: EndpointName, response: RawResponse) -> ParsedResponse | None:
+    def parse_response(
+        self, name: EndpointName, response: RawResponse
+    ) -> ParsedResponse | None:
         """Parses the response of the REST API function `name`."""
         return self._parse(self.rest_api, name, response)
 
     def parse_response_success(self, name: EndpointName, response: RawResponse) -> bool:
         """Venue-level success check of the REST API function `name` on top of the HTTP status, e.g. Bybit's retCode == 0."""
-        raise NotImplementedError(f"{type(self).__name__} does not implement parse_response_success()")
+        raise NotImplementedError(
+            f"{type(self).__name__} does not implement parse_response_success()"
+        )
 
-    def parse_response_error(self, name: EndpointName, response: RawResponse) -> str | None:
+    def parse_response_error(
+        self, name: EndpointName, response: RawResponse
+    ) -> str | None:
         """Venue's error message in the failed response of the REST API function `name`, e.g. Bybit's retMsg."""
-        raise NotImplementedError(f"{type(self).__name__} does not implement parse_response_error()")
+        raise NotImplementedError(
+            f"{type(self).__name__} does not implement parse_response_error()"
+        )
 
     def parse_message(self, channel: FullChannel, message: DecodedMessage) -> Any:
         """Parses the streaming message of the subscribed channel, e.g. "kline.1.BTCUSDT" for Bybit.
 
         The venue maps its full channel to the parsing method, since only the venue knows its channel format.
         """
-        raise NotImplementedError(f"{type(self).__name__} does not implement parse_message()")
+        raise NotImplementedError(
+            f"{type(self).__name__} does not implement parse_message()"
+        )
 
-    def parse_message_error(self, channel: FullChannel | None, message: DecodedMessage) -> str | None:
+    def parse_message_error(
+        self, channel: FullChannel | None, message: DecodedMessage
+    ) -> str | None:
         """Venue's error in the streaming message, e.g. a rejected subscription, None if not an error.
 
         NOTE: required so that a parser handles errors on purpose, e.g. only the channels it cares about,
@@ -78,7 +96,11 @@ class BaseParser:
         Args:
             channel: the subscribed channel the message belongs to, None if unknown, e.g. an error.
         """
-        raise NotImplementedError(f"{type(self).__name__} does not implement parse_message_error()")
+        raise NotImplementedError(
+            f"{type(self).__name__} does not implement parse_message_error()"
+        )
 
     def parse_markets(self, response: RawResponse) -> list[MarketDict]:
-        raise NotImplementedError(f"{type(self).__name__} does not implement parse_markets()")
+        raise NotImplementedError(
+            f"{type(self).__name__} does not implement parse_markets()"
+        )

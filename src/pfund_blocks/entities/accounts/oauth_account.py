@@ -22,7 +22,9 @@ class OAuthAccount(BaseAccount):
         token: str = "",
     ):
         super().__init__(env=env, venue=venue, name=name)
-        self._token: str = token or (self._dotenv.get(f"{self.venue}_ACCESS_TOKEN", "") or "")
+        self._token: str = token or (
+            self._dotenv.get(f"{self.venue}_ACCESS_TOKEN", "") or ""
+        )
 
     def _assert_no_credential_leak_in_backtest_env(self):
         if self._token:

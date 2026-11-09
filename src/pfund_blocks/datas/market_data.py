@@ -17,7 +17,9 @@ class MarketData(BaseData, ABC):
     def __init__(self, product: BaseProduct, resolution: Resolution):
         self.product: BaseProduct = product
         self.resolution: Resolution = resolution
-        self._resampler: TickData | BarData | None = None  # data used to be resampled into this data
+        self._resampler: TickData | BarData | None = (
+            None  # data used to be resampled into this data
+        )
         self._resamplees: list[BarData] = []  # opposite of resampler
 
     def to_dict(self) -> dict[str, Any]:

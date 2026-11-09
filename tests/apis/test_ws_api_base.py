@@ -46,7 +46,10 @@ class DummyParser(BaseParser):
             Channel.trade: "trade_updates",
         }
     )
-    def parse_message(self, channel: FullChannel, message: dict[str, Any]) -> list[int] | None:
+
+    def parse_message(
+        self, channel: FullChannel, message: dict[str, Any]
+    ) -> list[int] | None:
         # e.g. "1m.BTCUSDT" -> parse_candlestick()
         return self.parse_candlestick(message) if channel.startswith("1m.") else None
 
@@ -197,8 +200,12 @@ class TestCreatePrivateChannels:
 
     def test_channel_infos_have_no_product_and_resolution(self, api: DummyWebSocketAPI):
         api.create_private_channels()
-        assert api._channel_infos["position"] == ChannelInfo(product=None, resolution=None)
-        assert api._channel_infos["trade_updates"] == ChannelInfo(product=None, resolution=None)
+        assert api._channel_infos["position"] == ChannelInfo(
+            product=None, resolution=None
+        )
+        assert api._channel_infos["trade_updates"] == ChannelInfo(
+            product=None, resolution=None
+        )
 
 
 class TestChannels:
@@ -215,9 +222,13 @@ class TestChannels:
 
 
 class TestSetCallback:
-    def test_exclude_raw_message_when_skipping_parse_raises(self, api: DummyWebSocketAPI):
+    def test_exclude_raw_message_when_skipping_parse_raises(
+        self, api: DummyWebSocketAPI
+    ):
         with pytest.raises(ValueError, match="is not parsed, it can't be excluded"):
-            api.set_callback(lambda message: None, include_raw_message=False, skip_parse_message=True)
+            api.set_callback(
+                lambda message: None, include_raw_message=False, skip_parse_message=True
+            )
 
 
 class TestWebSockets:
@@ -401,7 +412,9 @@ class SplitWebSocketAPI(DummyWebSocketAPI):
         return [(f"P{x}", {**msg, "data": [x]}) for x in msg["data"] if x != 0]
 
 
-def connected_split_api(**callback_kwargs: Any) -> tuple[SplitWebSocketAPI, list[Message]]:
+def connected_split_api(
+    **callback_kwargs: Any,
+) -> tuple[SplitWebSocketAPI, list[Message]]:
     api = SplitWebSocketAPI()
     api.add_channel(
         api.create_market_data_channel(create_product(), Resolution("1m")),
@@ -413,7 +426,9 @@ def connected_split_api(**callback_kwargs: Any) -> tuple[SplitWebSocketAPI, list
 
 
 class TestSplitMessage:
-    def test_default_keeps_the_message_with_its_channels_product(self, api: DummyWebSocketAPI):
+    def test_default_keeps_the_message_with_its_channels_product(
+        self, api: DummyWebSocketAPI
+    ):
         channel = api.create_market_data_channel(create_product(), Resolution("1m"))
         msg = {"topic": channel, "data": [1, 2]}
         assert api._split_message(channel, msg) == [("DUMMY_BTCUSDT", msg)]
@@ -433,7 +448,9 @@ class TestSplitMessage:
 
     def test_empty_split_drops_the_message(self):
         api, received = connected_split_api()
-        asyncio.run(run(api, Server([kline(0), kline(3)]), until=lambda: len(received) == 1))
+        asyncio.run(
+            run(api, Server([kline(0), kline(3)]), until=lambda: len(received) == 1)
+        )
         assert [m["product"] for m in received] == ["P3"]
 
     def test_split_without_parsing(self):
@@ -551,9 +568,13 @@ class TestConnectLifecycle:
 
         async def main() -> None:
             api, _ = connected_api()
-            async with websockets.serve(Server([]).handler, "localhost", 0, process_request=reject) as ws_server:
+            async with websockets.serve(
+                Server([]).handler, "localhost", 0, process_request=reject
+            ) as ws_server:
                 api.url = f"ws://localhost:{ws_server.sockets[0].getsockname()[1]}"
-                await api.connect()  # doesn't raise, the error is only known once connecting has failed
+                await (
+                    api.connect()
+                )  # doesn't raise, the error is only known once connecting has failed
                 with pytest.raises(ExceptionGroup) as exc_info:
                     await asyncio.wait_for(api.wait_until_disconnected(), timeout=5)
                 assert exc_info.group_contains(InvalidStatus)
@@ -576,7 +597,10 @@ class TestConnectLifecycle:
     def test_disconnect_from_callback(self):
         async def main() -> None:
             api = DummyWebSocketAPI()
-            api.add_channel(api.create_market_data_channel(create_product(), Resolution("1m")), channel_type="public")
+            api.add_channel(
+                api.create_market_data_channel(create_product(), Resolution("1m")),
+                channel_type="public",
+            )
             received: list[Message] = []
 
             async def callback(message: Message) -> None:

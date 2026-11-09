@@ -1,0 +1,251 @@
+name: CI
+
+# Trigger CI on pushes to main and all pull requests
+# This ensures every code change is validated before merging
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    # Run on all PRs regardless of target branch
+    branches:
+      - '**'
+  # Let release.yml run CI before publishing
+  workflow_call:
+
+# CI only reads the code
+permissions:
+  contents: read
+
+jobs:
+  # Job 1: Lint and Format Check
+  # Runs the same ruff hooks (version, args) as prek does locally
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.3.3
+
+      - name: Run ruff
+        # fails if ruff-check finds issues or ruff-format would change a file
+        # No afterpython/ruff.toml means ruff isn't set up (and there are no ruff hooks), pass green.
+        run: |
+          if [ ! -f afterpython/ruff.toml ]; then
+            echo "afterpython/ruff.toml not found (ruff not set up); skipping."
+            exit 0
+          fi
+          uvx prek run --config afterpython/.pre-commit-config.yaml --all-files --show-diff-on-failure ruff-check ruff-format
+
+  # Job 2: Detect Test Strategy
+  # Determines whether to use pixi or uv based on pixi.toml presence
+  detect-test-strategy:
+    runs-on: ubuntu-latest
+    outputs:
+      use_pixi: ${{ steps.check.outputs.use_pixi }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Check for pixi.toml
+        id: check
+        run: |
+          if [ -f "pixi.toml" ]; then
+            echo "use_pixi=true" >> $GITHUB_OUTPUT
+          else
+            echo "use_pixi=false" >> $GITHUB_OUTPUT
+          fi
+
+  # Job 3.1: Test Suite - UV Workflow
+  # Traditional Python testing with uv for projects without pixi
+  test-uv:
+    needs: detect-test-strategy
+    if: needs.detect-test-strategy.outputs.use_pixi == 'false'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.13', '3.14', '3.15']
+      fail-fast: false
+
+    env:
+      # every uv command in this job uses this Python (uv downloads it if needed)
+      UV_PYTHON: ${{ matrix.python-version }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.3.3
+
+      - name: Install dependencies
+        # the package + all [dependency-groups] (e.g. test, dev), at the versions in uv.lock
+        # --locked fails if uv.lock is missing or out of date with pyproject.toml
+        run: uv sync --locked --all-groups
+
+      - name: Run tests with pytest
+        # No pytest in any dependency group means "no tests yet", pass green.
+        # Exit code 5 (no tests collected) is success too.
+        # `|| code=$?` because GitHub runs bash with -e, which would stop at pytest's failure.
+        run: |
+          if [ ! -x .venv/bin/pytest ]; then
+            echo "pytest not installed (not in any [dependency-groups]); skipping."
+            exit 0
+          fi
+          code=0
+          uv run --no-sync pytest -v || code=$?
+          if [ $code -eq 5 ]; then exit 0; else exit $code; fi
+
+  # Job 3.2: Test Suite - Pixi Workflow
+  # Pixi-based testing for projects using pixi.toml
+  test-pixi:
+    needs: detect-test-strategy
+    if: needs.detect-test-strategy.outputs.use_pixi == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: ['py313', 'py314', 'py315']
+      fail-fast: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up pixi
+        uses: prefix-dev/setup-pixi@v0.11.3
+        with:
+          pixi-version: v0.84.1
+          cache: true
+          # install (and cache) only the environment this matrix run tests
+          environments: ${{ matrix.environment }}
+          # Optional: Uncomment if you need prefix.dev authentication
+          # auth-host: prefix.dev
+          # auth-token: ${{ secrets.PREFIX_DEV_TOKEN }}
+
+      - name: Run tests with pixi
+        # Runs the "test" task of pixi.toml in this matrix run's environment (e.g. py313)
+        # Exit code 5 (no tests collected) is success.
+        # `|| code=$?` because GitHub runs bash with -e, which would stop at the failure.
+        run: |
+          code=0
+          pixi run -e ${{ matrix.environment }} test || code=$?
+          if [ $code -eq 5 ]; then exit 0; else exit $code; fi
+
+  # Job 3.3: Test Suite - Complete
+  # Unified test status for branch protection
+  test:
+    if: always()
+    needs: [detect-test-strategy, test-uv, test-pixi]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check test results
+        run: |
+          uv_result="${{ needs.test-uv.result }}"
+          pixi_result="${{ needs.test-pixi.result }}"
+          # Invariant: exactly one track runs (use_pixi gate) and must succeed;
+          # the other is skipped. Any other combination — both skipped (detect
+          # job died), both succeeded (broken gating), or anything failing —
+          # is red. The "no tests yet" case is handled inside the running track
+          # (pytest step exits 0), so it reports success here, not skipped.
+          if [ "$uv_result" == "success" ] && [ "$pixi_result" == "skipped" ]; then
+            echo "All tests passed (uv track)."
+            exit 0
+          elif [ "$pixi_result" == "success" ] && [ "$uv_result" == "skipped" ]; then
+            echo "All tests passed (pixi track)."
+            exit 0
+          else
+            echo "Tests did not pass cleanly: uv=$uv_result, pixi=$pixi_result"
+            exit 1
+          fi
+
+  # Job 4: Build Verification
+  # Ensures the package can be built successfully
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.3.3
+
+      - name: Build package
+        # --no-sources: build like it will be published, ignoring [tool.uv.sources] (local paths, git)
+        run: uv build --no-sources
+
+      - name: List build artifacts
+        # Show what was built (wheel + sdist)
+        # Useful for debugging build issues
+        run: ls -lh dist/
+
+      - name: Verify installation
+        # Install the wheel into a throwaway env and import it, catches packaging issues like missing files.
+        # Import name: [tool.uv.build-backend] module-name if set, else project.name with '-' -> '_'.
+        # python -P: don't put the current folder on sys.path, so the import can't pick up
+        # the source folder (or the afterpython/ folder) instead of the installed wheel.
+        run: |
+          uv run --isolated --no-project --with dist/*.whl python -P - <<'PY'
+          import importlib
+          import tomllib
+
+          with open("pyproject.toml", "rb") as f:
+              data = tomllib.load(f)
+          backend = data.get("tool", {}).get("uv", {}).get("build-backend", {})
+          names = backend.get("module-name") or data["project"]["name"].replace("-", "_")
+          for name in [names] if isinstance(names, str) else names:
+              importlib.import_module(name)
+              print(f"import {name} OK")
+          PY
+
+      - name: Upload build artifacts
+        # release.yml publishes exactly these files instead of building again
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  # Job 5: Type Check
+  # Runs `ap check` like the ty hook does locally, in the project's own environment
+  # (uv's .venv, or pixi's default environment when pixi.toml exists)
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Check for ty setup
+        # No afterpython/ty.toml means ty isn't set up (and there's no ty hook), pass green.
+        id: ty
+        run: |
+          if [ -f afterpython/ty.toml ]; then
+            echo "enabled=true" >> $GITHUB_OUTPUT
+          else
+            echo "afterpython/ty.toml not found (ty not set up); skipping."
+          fi
+
+      - name: Install uv
+        if: steps.ty.outputs.enabled == 'true' && hashFiles('pixi.toml') == ''
+        uses: astral-sh/setup-uv@v10.3.3
+
+      - name: Run ty (uv)
+        # the package + all [dependency-groups] (incl. afterpython itself), at the versions in uv.lock
+        if: steps.ty.outputs.enabled == 'true' && hashFiles('pixi.toml') == ''
+        run: |
+          uv sync --locked --all-groups
+          uv run --no-sync ap check
+
+      - name: Set up pixi
+        if: steps.ty.outputs.enabled == 'true' && hashFiles('pixi.toml') != ''
+        uses: prefix-dev/setup-pixi@v0.11.3
+        with:
+          pixi-version: v0.84.1
+          cache: true
+          environments: default
+
+      - name: Run ty (pixi)
+        # ty uses the pixi environment it runs in (there's no .venv in CI)
+        if: steps.ty.outputs.enabled == 'true' && hashFiles('pixi.toml') != ''
+        run: pixi run ap check

@@ -1,7 +1,6 @@
-from typing import Required, TypedDict
-
 from datetime import datetime, timedelta
 from decimal import Decimal
+from typing import Required, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -39,7 +38,9 @@ class BaseMarket(BaseModel):
         default=None, description="Date the market was listed"
     )
     expiration: datetime | None = Field(default=None, description="expiration date")
-    settlement_currency: str | None = Field(default=None, description="Settlement currency")
+    settlement_currency: str | None = Field(
+        default=None, description="Settlement currency"
+    )
     funding_interval: timedelta | None = Field(
         default=None, description="Funding interval"
     )

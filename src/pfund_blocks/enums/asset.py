@@ -20,11 +20,10 @@ Product type only answers "what type is it". Details of a specific product, e.g.
 delivery, are product specs and belong to the product, not here.
 """
 
-from typing import Self
-
 import re
 from decimal import Decimal
 from enum import StrEnum
+from typing import Self
 
 from pfund_blocks.utils import trim_trailing_zeros
 

@@ -97,7 +97,7 @@ class BaseVenue:
             name: unique product name, if not provided, derived by the adapter's create_name()
             specs: the product class's specs, e.g. expiration for a future
         """
-        Product = ProductFactory(basis)
+        Product = ProductFactory(basis)  # noqa: N806 (holds a class)
         # the adapter is passed via the validation context, so that the product derives its symbol and name
         # with the venue's conventions once its specs are validated (e.g. expiration as a date)
         product = Product.model_validate(

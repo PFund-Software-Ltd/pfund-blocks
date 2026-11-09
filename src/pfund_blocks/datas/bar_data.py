@@ -26,15 +26,27 @@ def parse_shift(resolution: Resolution, shift: str) -> int:
     if not shift:
         return 0
     if resolution.is_second():
-        raise ValueError(f"{resolution!r} can't be shifted, there is no smaller unit than a second")
+        raise ValueError(
+            f"{resolution!r} can't be shifted, there is no smaller unit than a second"
+        )
     shift_ns = Resolution(shift).to_seconds() * NS_PER_SECOND
     resolution_ns = resolution.to_seconds() * NS_PER_SECOND
     if shift_ns >= resolution_ns:
         raise ValueError(f"{shift=} must be shorter than one {resolution!r} bar")
     # the next smaller unit: hours for day bars, minutes for hour bars, seconds for minute bars
-    unit_ns = resolution.timeframe.value * NS_PER_SECOND // (24 if resolution.is_day() else 60)
+    unit_ns = (
+        resolution.timeframe.value
+        * NS_PER_SECOND
+        // (24 if resolution.is_day() else 60)
+    )
     if shift_ns % unit_ns:
-        unit = "hours" if resolution.is_day() else "minutes" if resolution.is_hour() else "seconds"
+        unit = (
+            "hours"
+            if resolution.is_day()
+            else "minutes"
+            if resolution.is_hour()
+            else "seconds"
+        )
         raise ValueError(f"{shift=} must be whole {unit} for {resolution!r}")
     return shift_ns
 
@@ -68,7 +80,9 @@ class Bar(BaseDataPoint, kw_only=True, frozen=True):
     # timestamps below are int64 ns since epoch; gt-bound catches passing seconds by mistake
     start_ts: Annotated[int, Meta(gt=10_000_000_000)]
     end_ts: Annotated[int, Meta(gt=10_000_000_000)]
-    updated_ts: Annotated[int, Meta(gt=10_000_000_000)]  # when this state was produced, after end_ts if the venue confirms a closed bar late
+    updated_ts: Annotated[
+        int, Meta(gt=10_000_000_000)
+    ]  # when this state was produced, after end_ts if the venue confirms a closed bar late
     # NOTE: prices are not bound to > 0 on purpose, they can be zero or negative, e.g. WTI futures in 2020, calendar spreads
     open: float
     high: float
@@ -79,7 +93,9 @@ class Bar(BaseDataPoint, kw_only=True, frozen=True):
 
     def __post_init__(self):
         if self.start_ts >= self.end_ts:
-            raise ValueError(f"start_ts ({self.start_ts}) must be < end_ts ({self.end_ts})")
+            raise ValueError(
+                f"start_ts ({self.start_ts}) must be < end_ts ({self.end_ts})"
+            )
         if self.high < max(self.open, self.low, self.close):
             raise ValueError(f"high ({self.high}) must be >= open, low and close")
         if self.low > min(self.open, self.high, self.close):
@@ -96,9 +112,16 @@ class Bar(BaseDataPoint, kw_only=True, frozen=True):
 
     def _format(self, header: str) -> str:
         start_dt, end_dt = self.start_dt, self.end_dt
-        end_format = "%H:%M:%S" if start_dt.date() == end_dt.date() else "%Y-%m-%d %H:%M:%S"
+        end_format = (
+            "%H:%M:%S" if start_dt.date() == end_dt.date() else "%Y-%m-%d %H:%M:%S"
+        )
         header = f"{header} {self.resolution} | {start_dt:%Y-%m-%d %H:%M:%S} → {end_dt:{end_format}}"
-        ohlcv = f"  O={self.open} | H={self.high} | L={self.low} | C={self.close} | volume={self.volume} (update@{self.updated_dt:%H:%M:%S.%f}"[:-3] + ")"
+        ohlcv = (
+            f"  O={self.open} | H={self.high} | L={self.low} | C={self.close} | volume={self.volume} (update@{self.updated_dt:%H:%M:%S.%f}"[
+                :-3
+            ]
+            + ")"
+        )
         return f"{header}\n{ohlcv}"
 
     @property
@@ -142,7 +165,11 @@ class BarData(MarketData):
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, BarData):
             return NotImplemented
-        return (self.product, self.resolution, self._shift_ns) == (other.product, other.resolution, other._shift_ns)
+        return (self.product, self.resolution, self._shift_ns) == (
+            other.product,
+            other.resolution,
+            other._shift_ns,
+        )
 
     def __hash__(self):
         return hash((self.product, self.resolution, self._shift_ns))
@@ -150,11 +177,14 @@ class BarData(MarketData):
     def __str__(self):
         if self._bar is None:
             return f"[BarData ○] {self.product.name} | {self.resolution}"
-        return self._bar._format(f"[BarData {self._bar._closed_mark}] {self.product.name} |")
+        return self._bar._format(
+            f"[BarData {self._bar._closed_mark}] {self.product.name} |"
+        )
 
     @property
     def bar(self) -> Bar | None:
         return self._bar
+
     kline = bar
     candlestick = bar
 
@@ -174,9 +204,15 @@ class BarData(MarketData):
             return False
         # any window of this data and the resampler's bar it starts in, the same holds for all the other windows
         start_ts, end_ts = get_bar_window(0, self.resolution, self.shift)
-        resampler_start_ts, resampler_end_ts = get_bar_window(start_ts, resolution, shift)
-        starts_together = resampler_start_ts == start_ts  # e.g. unshifted 1m bars don't start with 5m bars with shift='30s'
-        is_whole_number = (end_ts - start_ts) % (resampler_end_ts - resampler_start_ts) == 0  # e.g. a 5m bar isn't a whole number of 3m bars
+        resampler_start_ts, resampler_end_ts = get_bar_window(
+            start_ts, resolution, shift
+        )
+        starts_together = (
+            resampler_start_ts == start_ts
+        )  # e.g. unshifted 1m bars don't start with 5m bars with shift='30s'
+        is_whole_number = (end_ts - start_ts) % (
+            resampler_end_ts - resampler_start_ts
+        ) == 0  # e.g. a 5m bar isn't a whole number of 3m bars
         return starts_together and is_whole_number
 
     def bind_resampler(self, resampler: TickData | BarData):
@@ -188,14 +224,24 @@ class BarData(MarketData):
         that doesn't fit raising mid-session. e.g. a 3m bar from 9:03 to 9:06 can't fit in a 5m bar.
         """
         if not isinstance(resampler, (TickData, BarData)):
-            raise TypeError(f"resampler must be TickData or BarData, got {type(resampler).__name__}")
+            raise TypeError(
+                f"resampler must be TickData or BarData, got {type(resampler).__name__}"
+            )
         if self._resampler is not None:
-            raise ValueError(f"{self.resolution!r} data already has a resampler {self._resampler.resolution!r}")
+            raise ValueError(
+                f"{self.resolution!r} data already has a resampler {self._resampler.resolution!r}"
+            )
         if resampler.product != self.product:
-            raise ValueError(f"resampler's product {resampler.product} does not match {self.product}")
+            raise ValueError(
+                f"resampler's product {resampler.product} does not match {self.product}"
+            )
         if resampler.resolution <= self.resolution:
-            raise ValueError(f"resampler's resolution {resampler.resolution!r} must be finer than {self.resolution!r}")
-        if isinstance(resampler, BarData) and not self.can_resample_from(resampler.resolution, resampler.shift):
+            raise ValueError(
+                f"resampler's resolution {resampler.resolution!r} must be finer than {self.resolution!r}"
+            )
+        if isinstance(resampler, BarData) and not self.can_resample_from(
+            resampler.resolution, resampler.shift
+        ):
             raise ValueError(
                 f"{resampler.resolution!r} bars with shift={resampler.shift!r} do not fit in {self.resolution!r} bars with shift={self.shift!r}"
             )
@@ -252,14 +298,20 @@ class BarData(MarketData):
         if bar.resolution == self.resolution:
             # NOTE: only when shifted, an unshifted bar's window is whatever the venue says, e.g. a venue's daily bar may not start at 00:00 UTC
             if self.shift and (bar.start_ts, bar.end_ts) != (start_ts, end_ts):
-                raise ValueError(f"bar {bar.start_dt} → {bar.end_dt} is not in the window of {self.resolution!r} with shift={self.shift!r}")
+                raise ValueError(
+                    f"bar {bar.start_dt} → {bar.end_dt} is not in the window of {self.resolution!r} with shift={self.shift!r}"
+                )
         elif bar.resolution < self.resolution:
             raise ValueError(f"{bar.resolution!r} is coarser than {self.resolution!r}")
         elif not bar.is_closed:
-            raise ValueError(f"{bar.resolution!r} bar is not closed, it can't be merged into {self.resolution!r}")
+            raise ValueError(
+                f"{bar.resolution!r} bar is not closed, it can't be merged into {self.resolution!r}"
+            )
         # e.g. a 3m bar from 9:03 to 9:06 can't be merged into a 5m bar, part of it belongs to the next 5m bar
         elif bar.end_ts > end_ts:
-            raise ValueError(f"{bar.resolution!r} bar {bar.start_dt} → {bar.end_dt} does not fit in a {self.resolution!r} bar")
+            raise ValueError(
+                f"{bar.resolution!r} bar {bar.start_dt} → {bar.end_dt} does not fit in a {self.resolution!r} bar"
+            )
 
     def close(self) -> list[ClosedBar]:
         """Closes the current bar if it is still open and updates all its resamplees with it, returns every bar closed by this, finest first.
@@ -287,7 +339,9 @@ class BarData(MarketData):
         current = self._bar
         closed_bars: list[ClosedBar] = []
         if current is not None:
-            if bar.start_ts < current.start_ts or (bar.start_ts == current.start_ts and current.is_closed):
+            if bar.start_ts < current.start_ts or (
+                bar.start_ts == current.start_ts and current.is_closed
+            ):
                 return closed_bars
             # the venue never closed the current bar before moving on to a later window
             if bar.start_ts > current.start_ts and not current.is_closed:
@@ -330,7 +384,12 @@ class BarData(MarketData):
         # the value is in the current bar's window: add it to the current bar
         else:
             start_ts, end_ts = current.start_ts, current.end_ts
-            open_, high, low, volume = current.open, max(current.high, high), min(current.low, low), current.volume + volume
+            open_, high, low, volume = (
+                current.open,
+                max(current.high, high),
+                min(current.low, low),
+                current.volume + volume,
+            )
             # a late value still adds to high, low and volume, but it can't change the close
             is_late = updated_ts < current.updated_ts
             if is_late:

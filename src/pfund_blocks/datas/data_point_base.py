@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from typing import Annotated, Any
-
 import time
+from typing import Annotated, Any
 
 from msgspec import Meta, Struct, field, structs
 
@@ -21,8 +20,12 @@ class BaseDataPoint(
     """A single point of market data, e.g. a bar or a tick."""
 
     # timestamps below are int64 ns since epoch; gt-bound catches passing seconds by mistake
-    server_ts: Annotated[int, Meta(gt=10_000_000_000)] | None = None  # when the server (venue or data source) sent this update
-    created_at: int = field(default_factory=time.time_ns)  # stamped automatically by our system, don't set it manually
+    server_ts: Annotated[int, Meta(gt=10_000_000_000)] | None = (
+        None  # when the server (venue or data source) sent this update
+    )
+    created_at: int = field(
+        default_factory=time.time_ns
+    )  # stamped automatically by our system, don't set it manually
 
     def to_dict(self) -> dict[str, Any]:
         return structs.asdict(self)

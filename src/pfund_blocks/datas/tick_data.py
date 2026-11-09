@@ -20,7 +20,9 @@ from pfund_blocks.utils.temporal import ns_to_dt
 class Tick(BaseDataPoint, kw_only=True, frozen=True):
     """A single trade in the market."""
 
-    ts: Annotated[int, Meta(gt=10_000_000_000)]  # when the trade happened, int64 ns since epoch
+    ts: Annotated[
+        int, Meta(gt=10_000_000_000)
+    ]  # when the trade happened, int64 ns since epoch
     # NOTE: price is not bound to > 0 on purpose, it can be zero or negative, e.g. WTI futures in 2020, calendar spreads
     price: float
     volume: float

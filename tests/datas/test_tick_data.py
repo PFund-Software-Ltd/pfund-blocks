@@ -64,7 +64,9 @@ class TestTick:
 
     def test_side_round_trip(self):
         tick = Tick(ts=T0, price=100.0, volume=1.0, side=Side.SELL)
-        assert msgspec.json.decode(msgspec.json.encode(tick), type=Tick).side == Side.SELL
+        assert (
+            msgspec.json.decode(msgspec.json.encode(tick), type=Tick).side == Side.SELL
+        )
 
     def test_invalid_side_raises(self):
         with pytest.raises(msgspec.ValidationError, match="side"):

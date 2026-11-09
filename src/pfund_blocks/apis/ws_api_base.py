@@ -40,15 +40,21 @@ class WebSocket(ClientConnection):
 
 class BaseWebSocketAPI[AccountT: BaseAccount = BaseAccount](ABC):
     venue: ClassVar[str]  # upper case, consistent with BaseRestAPI.venue, e.g. "BYBIT"
-    urls: ClassVar[dict[Literal[Environment.PAPER, Environment.LIVE], dict[ChannelType, str]]]
-    version: ClassVar[str | None] = None  # e.g. "v5" for Bybit, None if the venue's API is not versioned
+    urls: ClassVar[
+        dict[Literal[Environment.PAPER, Environment.LIVE], dict[ChannelType, str]]
+    ]
+    version: ClassVar[str | None] = (
+        None  # e.g. "v5" for Bybit, None if the venue's API is not versioned
+    )
     parser: ClassVar[BaseParser]
     # the venue's app-level ping, e.g. {"op": "ping"} for Bybit, None if not required.
     # NOTE: protocol-level pings (for detecting dead connections) are always sent by websockets
     ping_message: ClassVar[dict[str, Any] | None] = None
     ping_interval: ClassVar[float] = 20  # seconds between app-level pings
 
-    def __init__(self, env: Literal[Environment.PAPER, Environment.LIVE, "PAPER", "LIVE"]):
+    def __init__(
+        self, env: Literal[Environment.PAPER, Environment.LIVE, "PAPER", "LIVE"]
+    ):
         """
         Args:
             env: PAPER (e.g. testnet) or LIVE.
@@ -73,7 +79,9 @@ class BaseWebSocketAPI[AccountT: BaseAccount = BaseAccount](ABC):
         self._skip_parse_message = False
 
     @staticmethod
-    def _validate_env(env: Environment | str) -> Literal[Environment.PAPER, Environment.LIVE]:
+    def _validate_env(
+        env: Environment | str,
+    ) -> Literal[Environment.PAPER, Environment.LIVE]:
         env = Environment(env.upper())
         if env not in (Environment.PAPER, Environment.LIVE):
             raise ValueError(f"environment {env} is not supported, only PAPER or LIVE")
@@ -85,9 +93,13 @@ class BaseWebSocketAPI[AccountT: BaseAccount = BaseAccount](ABC):
 
     def add_account(self, account: AccountT) -> None:
         if account.env != self._env:
-            raise ValueError(f"account env {account.env} does not match websocket env {self._env}")
+            raise ValueError(
+                f"account env {account.env} does not match websocket env {self._env}"
+            )
         if account.venue != self.venue:
-            raise ValueError(f"account venue {account.venue} does not match websocket venue {self.venue}")
+            raise ValueError(
+                f"account venue {account.venue} does not match websocket venue {self.venue}"
+            )
         if account in self._accounts.values():
             return
         if account.name not in self._accounts:
@@ -103,21 +115,27 @@ class BaseWebSocketAPI[AccountT: BaseAccount = BaseAccount](ABC):
         else:
             raise ValueError(f"product name {product.name} has already been registered")
 
-    def create_market_data_channel(self, product: BaseProduct, resolution: Resolution) -> FullChannel:
+    def create_market_data_channel(
+        self, product: BaseProduct, resolution: Resolution
+    ) -> FullChannel:
         """Creates the venue's market data channel of the product, e.g. "kline.1.BTCUSDT" for Bybit's 1m bars."""
         supported_resolutions = self.get_supported_resolutions(product)
         if resolution not in supported_resolutions:
             raise ValueError(
-                f"{self.venue} {product.name} {resolution=} is not supported, " +
-                f"supported resolutions: {[repr(r) for r in supported_resolutions]}"
+                f"{self.venue} {product.name} {resolution=} is not supported, "
+                + f"supported resolutions: {[repr(r) for r in supported_resolutions]}"
             )
         full_channel = self._create_market_data_channel(product, resolution)
         self.add_product(product)
-        self._channel_infos[full_channel] = ChannelInfo(product=product.name, resolution=repr(resolution))
+        self._channel_infos[full_channel] = ChannelInfo(
+            product=product.name, resolution=repr(resolution)
+        )
         return full_channel
 
     @abstractmethod
-    def _create_market_data_channel(self, product: BaseProduct, resolution: Resolution) -> FullChannel: ...
+    def _create_market_data_channel(
+        self, product: BaseProduct, resolution: Resolution
+    ) -> FullChannel: ...
 
     @classmethod
     @abstractmethod
@@ -144,28 +162,46 @@ class BaseWebSocketAPI[AccountT: BaseAccount = BaseAccount](ABC):
         for private_channel in PrivateChannel:
             try:
                 # NOTE: strict=True, otherwise an unmapped channel is returned as is and wrongly subscribed
-                echannel = str(self.parser.adapter.to_source(Channel(private_channel), group="channel", strict=True))
+                echannel = str(
+                    self.parser.adapter.to_source(
+                        Channel(private_channel), group="channel", strict=True
+                    )
+                )
             except KeyError:
                 continue  # unmapped, i.e. the venue doesn't stream it
             if echannel not in channels:
                 channels.append(echannel)
-                self._channel_infos[echannel] = ChannelInfo(product=None, resolution=None)
+                self._channel_infos[echannel] = ChannelInfo(
+                    product=None, resolution=None
+                )
         return channels
 
-    def add_channel(self, channel: FullChannel, *, channel_type: ChannelType | Literal["public", "private"]):
+    def add_channel(
+        self,
+        channel: FullChannel,
+        *,
+        channel_type: ChannelType | Literal["public", "private"],
+    ):
         channel_type = ChannelType(channel_type.lower())
         if channel not in self._channels[channel_type]:
             self._channels[channel_type].append(channel)
             self._logger.debug(f"added {channel_type} channel '{channel}'")
 
-    def remove_channel(self, channel: FullChannel, *, channel_type: ChannelType | Literal["public", "private"]):
+    def remove_channel(
+        self,
+        channel: FullChannel,
+        *,
+        channel_type: ChannelType | Literal["public", "private"],
+    ):
         channel_type = ChannelType(channel_type.lower())
         if channel in self._channels[channel_type]:
             self._channels[channel_type].remove(channel)
             self._logger.debug(f"removed {channel_type} channel '{channel}'")
 
     @abstractmethod
-    async def subscribe(self, ws: WebSocket, channels: list[FullChannel], channel_type: ChannelType) -> None:
+    async def subscribe(
+        self, ws: WebSocket, channels: list[FullChannel], channel_type: ChannelType
+    ) -> None:
         """Converts the channels into the venue's subscription request(s) and sends them via _send().
 
         NOTE: a manual call only lasts until the websocket reconnects, also call add_channel() to keep it.
@@ -173,7 +209,9 @@ class BaseWebSocketAPI[AccountT: BaseAccount = BaseAccount](ABC):
         ...
 
     @abstractmethod
-    async def unsubscribe(self, ws: WebSocket, channels: list[FullChannel], channel_type: ChannelType) -> None:
+    async def unsubscribe(
+        self, ws: WebSocket, channels: list[FullChannel], channel_type: ChannelType
+    ) -> None:
         """Converts the channels into the venue's unsubscription request(s) and sends them via _send().
 
         NOTE: a manual call only lasts until the websocket reconnects, also call remove_channel() to keep it.
@@ -198,13 +236,17 @@ class BaseWebSocketAPI[AccountT: BaseAccount = BaseAccount](ABC):
                 e.g. to parse it later elsewhere. Errors are still parsed into Message["error"].
         """
         if not include_raw_message and skip_parse_message:
-            raise ValueError(f"{self.venue}'s message is not parsed, it can't be excluded")
+            raise ValueError(
+                f"{self.venue}'s message is not parsed, it can't be excluded"
+            )
         self._callback = callback
         self._include_raw_message = include_raw_message
         self._skip_parse_message = skip_parse_message
 
     @abstractmethod
-    def _parse_message(self, ws: WebSocket, raw_msg: RawMessage) -> tuple[FullChannel | None, DecodedMessage] | None:
+    def _parse_message(
+        self, ws: WebSocket, raw_msg: RawMessage
+    ) -> tuple[FullChannel | None, DecodedMessage] | None:
         """Decodes the venue's message (e.g. JSON, decompression) and finds its channel.
         The decoded message is then checked for errors and parsed by the venue's parser.
 
@@ -215,7 +257,9 @@ class BaseWebSocketAPI[AccountT: BaseAccount = BaseAccount](ABC):
         """
         ...
 
-    def _split_message(self, full_channel: FullChannel | None, msg: DecodedMessage) -> list[tuple[ProductName | None, DecodedMessage]]:
+    def _split_message(
+        self, full_channel: FullChannel | None, msg: DecodedMessage
+    ) -> list[tuple[ProductName | None, DecodedMessage]]:
         """Splits the decoded message into one message per product, before it is parsed.
 
         Override it for a channel of many products, e.g. Bybit's option trades are streamed per base coin.
@@ -285,7 +329,9 @@ class BaseWebSocketAPI[AccountT: BaseAccount = BaseAccount](ABC):
         public_channels = self._channels[ChannelType.public]
         private_channels = self._channels[ChannelType.private]
         if private_channels and not self._accounts:
-            raise ValueError(f"private channels {private_channels} are added but no accounts")
+            raise ValueError(
+                f"private channels {private_channels} are added but no accounts"
+            )
         if not public_channels and not private_channels:
             raise ValueError("no channels added, nothing to connect")
         if self._callback is None:
@@ -334,10 +380,14 @@ class BaseWebSocketAPI[AccountT: BaseAccount = BaseAccount](ABC):
         async for conn in websockets.connect(url, create_connection=WebSocket):
             if not self._is_running:  # disconnect() was called during the handshake
                 break
-            ws = cast(WebSocket, conn)  # connect() isn't generic, it is typed as ClientConnection
+            ws = cast(
+                WebSocket, conn
+            )  # connect() isn't generic, it is typed as ClientConnection
             self._add_websocket(ws_name, ws)
             self._logger.debug(f"{ws_name} is connected")
-            ping_task = asyncio.create_task(self._ping_loop(ws)) if self.ping_message else None
+            ping_task = (
+                asyncio.create_task(self._ping_loop(ws)) if self.ping_message else None
+            )
             try:
                 # TODO: step 4
                 # if account:
@@ -349,23 +399,41 @@ class BaseWebSocketAPI[AccountT: BaseAccount = BaseAccount](ABC):
                     received_at = time.time_ns()
                     try:
                         # NOTE: _parse_message() runs even without a callback, it also handles control messages
-                        if (result := self._parse_message(ws, raw_msg)) is None or self._callback is None:
+                        if (
+                            result := self._parse_message(ws, raw_msg)
+                        ) is None or self._callback is None:
                             continue
                         full_channel, msg = result
                         error = self.parser.parse_message_error(full_channel, msg)
-                        channel_info = self._channel_infos.get(full_channel) if full_channel else None
-                        for product, product_msg in self._split_message(full_channel, msg):
+                        channel_info = (
+                            self._channel_infos.get(full_channel)
+                            if full_channel
+                            else None
+                        )
+                        for product, product_msg in self._split_message(
+                            full_channel, msg
+                        ):
                             data = None
-                            if not self._skip_parse_message and full_channel and error is None:
-                                data = self.parser.parse_message(full_channel, product_msg)
+                            if (
+                                not self._skip_parse_message
+                                and full_channel
+                                and error is None
+                            ):
+                                data = self.parser.parse_message(
+                                    full_channel, product_msg
+                                )
                             message: Message = {
                                 "source": self.venue,
                                 "account": account.name if account else None,
                                 "channel": full_channel,
                                 "product": product,
-                                "resolution": channel_info.resolution if channel_info else None,
+                                "resolution": channel_info.resolution
+                                if channel_info
+                                else None,
                                 "received_at": received_at,
-                                "message": product_msg if self._include_raw_message else None,
+                                "message": product_msg
+                                if self._include_raw_message
+                                else None,
                                 "data": data,
                                 "error": error,
                                 "extra": {},
@@ -373,7 +441,9 @@ class BaseWebSocketAPI[AccountT: BaseAccount = BaseAccount](ABC):
                             await self._dispatch_message(message)
                     except Exception:
                         # one bad message shouldn't kill the stream
-                        self._logger.exception(f"{ws_name} failed to handle message {raw_msg!r}")
+                        self._logger.exception(
+                            f"{ws_name} failed to handle message {raw_msg!r}"
+                        )
             except ConnectionClosedError as err:
                 self._logger.warning(f"{ws_name} connection lost ({err})")
             finally:

@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from typing import Any
-
 from decimal import Decimal
 from enum import IntEnum
+from typing import Any
 
 
 class Side(IntEnum):

@@ -1,6 +1,5 @@
-from typing import Any, Self
-
 from enum import Enum
+from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
