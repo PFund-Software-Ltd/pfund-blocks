@@ -42,7 +42,7 @@ scripts = ["scripts/link-venv.sh"]
 
 [feature.dev.pypi-dependencies]
 pfund-blocks = { path = ".", editable = true }
-afterpython = ">=0.4.6"
+afterpython = ">=0.5.3"
 
 [feature.test.pypi-dependencies]
 pfund-blocks = { path = ".", editable = true }

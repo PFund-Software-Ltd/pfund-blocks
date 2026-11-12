@@ -15,6 +15,11 @@ dependencies = [
     "pydantic>=2.12.5",
 ]
 
+[dependency-groups]
+dev = [
+    "afterpython>=0.5.3",
+]
+
 [project.urls]
 homepage = "https://pfund.ai"
 repository = "https://github.com/PFund-Software-Ltd/pfund-blocks"
