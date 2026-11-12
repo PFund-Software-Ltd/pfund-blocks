@@ -1,11 +1,13 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, Literal, TypeAlias, TypedDict, ClassVar
+
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, TypedDict
 
 if TYPE_CHECKING:
+    from pfund.enums import TradingVenue
     from pfund.venues.adapter_base import BaseAdapter
+
     from pfund_blocks.entities.accounts.account_base import BaseAccount
     from pfund_blocks.entities.products.product_base import BaseProduct
-    from pfund.enums import TradingVenue
 
     # TODO
     class OrderUpdate(TypedDict):
@@ -18,10 +20,10 @@ if TYPE_CHECKING:
         ]
 
 
-import math
-from uuid import uuid4
-from decimal import Decimal, ROUND_HALF_UP
 import builtins
+import math
+from decimal import ROUND_HALF_UP, Decimal
+from uuid import uuid4
 
 from pydantic import (
     BaseModel,
@@ -32,18 +34,17 @@ from pydantic import (
     model_validator,
 )
 
-from pfund.entities.orders.trailing_stop import TrailingStop
-from pfund.entities.trades.trade import Trade
-from pfund.entities.trades.quantity import Quantity
+from pfund_blocks.entities.orders.order_status import OrderStatus
+from pfund_blocks.entities.orders.trailing_stop import TrailingStop
+from pfund_blocks.entities.trades.quantity import Quantity
+from pfund_blocks.entities.trades.trade import Trade
+from pfund_blocks.enums.order_type import OrderType
+from pfund_blocks.enums.side import Side
 from pfund_blocks.enums.time_in_force import TimeInForce
 from pfund_blocks.utils import trim_trailing_zeros
-from pfund.entities.orders.order_status import OrderStatus
-from pfund_blocks.enums.side import Side
-from pfund_blocks.enums.order_type import OrderType
 
-
-OrderKey: TypeAlias = str  # order key = client order id
-StrategyName: TypeAlias = str
+type OrderKey = str  # order key = client order id
+type StrategyName = str
 
 
 class BaseOrder(BaseModel):
@@ -491,7 +492,7 @@ class BaseOrder(BaseModel):
     def __repr__(self):
         return (
             f"{self.creator}|{self.venue}|{self.account.name}|{self.product.name}|"
-            f"{self.key}|{self.id}|{self.status.FIX}|{repr(self.status)}|"
+            f"{self.key}|{self.id}|{self.status.FIX}|{self.status!r}|"
             f"{self.type}|{self.tif}|{self.size}@{self.price}|"
             f"filled={self.filled_size}@{self.avg_price}|"
             f"last={self.lts}@{self.ltp}|"

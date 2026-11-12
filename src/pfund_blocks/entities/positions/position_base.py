@@ -1,16 +1,16 @@
 from __future__ import annotations
-from typing import ClassVar
 
 import time
 from decimal import Decimal
+from typing import ClassVar
 
+from pfund.enums import TradingVenue
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, computed_field
 
 from pfund_blocks.entities.products.product_base import BaseProduct
-from pfund.entities.trades.quantity import Quantity
+from pfund_blocks.entities.trades.quantity import Quantity
 from pfund_blocks.enums.position_mode import PositionMode
 from pfund_blocks.enums.side import Side
-from pfund.enums import TradingVenue
 
 
 class BasePosition(BaseModel):

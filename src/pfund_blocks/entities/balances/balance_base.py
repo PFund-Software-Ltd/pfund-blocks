@@ -1,25 +1,13 @@
 from __future__ import annotations
-from typing import ClassVar, Literal, Generic, TypeVar, TypeAlias
 
 from decimal import Decimal
+from typing import ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, computed_field
 
 from pfund_blocks.typing import AccountName, Currency
 
-
-SnapshotT = TypeVar("SnapshotT", bound="BaseBalance.Snapshot")
-BalanceUpdateSource: TypeAlias = Literal["get_balances", "websocket"]
-
-
-class BalanceUpdate(BaseModel, Generic[SnapshotT]):
-    ts: float = Field(description="Timestamp provided by the venue")
-    account: AccountName
-    snapshots: dict[Currency, SnapshotT]
-    # the account-level consolidated balance (in the account's settlement
-    # currency), distinct from the per-currency ``snapshots`` above
-    account_balance: SnapshotT | None = None
-    source: BalanceUpdateSource
+type BalanceUpdateSource = Literal["get_balances", "websocket"]
 
 
 class BaseBalance(BaseModel):
@@ -75,3 +63,13 @@ class BaseBalance(BaseModel):
 
     def __repr__(self):
         return f"{self.currency} | cash={self.cash} | equity={self.equity} | available={self.available}"
+
+
+class BalanceUpdate[SnapshotT: BaseBalance.Snapshot](BaseModel):
+    ts: float = Field(description="Timestamp provided by the venue")
+    account: AccountName
+    snapshots: dict[Currency, SnapshotT]
+    # the account-level consolidated balance (in the account's settlement
+    # currency), distinct from the per-currency ``snapshots`` above
+    account_balance: SnapshotT | None = None
+    source: BalanceUpdateSource

@@ -1,13 +1,15 @@
 from __future__ import annotations
+
 from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
     from decimal import Decimal
-    from pfund.entities.positions.position_base import PositionUpdate
 
-from pydantic import PrivateAttr, Field, model_validator
+    from pfund_blocks.entities.positions.position_base import PositionUpdate
 
-from pfund.entities.positions.position_base import BasePosition, PositionSnapshot
+from pydantic import Field, PrivateAttr, model_validator
+
+from pfund_blocks.entities.positions.position_base import BasePosition, PositionSnapshot
 from pfund_blocks.enums.position_mode import PositionMode
 from pfund_blocks.enums.side import Side
 

@@ -1,9 +1,11 @@
 from __future__ import annotations
+
 from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from pydantic import GetCoreSchemaHandler
     from pydantic_core import CoreSchema
+
     from pfund_blocks.entities.products.product_base import BaseProduct
 
 from decimal import Decimal

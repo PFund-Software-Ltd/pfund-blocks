@@ -1,8 +1,8 @@
 from __future__ import annotations
-from typing import TypeAlias
 
 import time
 from enum import StrEnum
+from typing import ClassVar
 
 from pfund.utils import Timestamp
 
@@ -79,7 +79,7 @@ class OrderStatus:
         MISSED = M = "MISSED"
 
     _CATEGORIES = (Main, Fill, Cancel, Amend)
-    Category: TypeAlias = Main | Fill | Cancel | Amend
+    type Category = Main | Fill | Cancel | Amend
 
     # Maps each internal slot value to its FIX OrdStatus. Nested by category
     # because slot values collide across categories (e.g. Cancel.SUBMITTED ==
@@ -95,7 +95,9 @@ class OrderStatus:
     #                                    still working, so it must not override
     #   - Amend.AMENDED               -> order is working again; NEW vs
     #                                    PARTIALLY_FILLED comes from Main/Fill
-    _FIX_MAPPING: dict[type[OrderStatus.Category], dict[OrderStatus.Category, FIX]] = {
+    _FIX_MAPPING: ClassVar[
+        dict[type[OrderStatus.Category], dict[OrderStatus.Category, FIX]]
+    ] = {
         Main: {
             Main.PENDING: FIX.PENDING_NEW,
             Main.ACTIVE: FIX.NEW,
@@ -187,7 +189,7 @@ class OrderStatus:
         return is_updated
 
     @property
-    def FIX(self) -> FIX | None:
+    def FIX(self) -> FIX | None:  # noqa: N802 (FIX is the protocol name)
         """Collapse the four orthogonal slots into the single canonical FIX
         OrdStatus (tag 39). Returns None for purely pfund-internal states that
         have no FIX equivalent (e.g. only Main.BLOCKED or Main.MISSED is set).

@@ -1,13 +1,13 @@
 from __future__ import annotations
-from typing import Literal, Any
 
 from decimal import Decimal
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field, ConfigDict, computed_field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
-from pfund_blocks.typing import Currency
-from pfund.entities.trades.quantity import Quantity
+from pfund_blocks.entities.trades.quantity import Quantity
 from pfund_blocks.enums.side import Side
+from pfund_blocks.typing import Currency
 
 
 class Trade(BaseModel):
