@@ -41,7 +41,7 @@ class TestBaseData:
 class TestMarketData:
     def test_is_abstract(self):
         with pytest.raises(TypeError, match="abstract"):
-            MarketData(create_product(), Resolution("1m"))  # ty: ignore[call-non-callable]
+            MarketData(create_product(), Resolution("1m"))  # ty: ignore[abstract-class-instantiation]
 
     def test_to_dict(self):
         data = create_data("5m")
