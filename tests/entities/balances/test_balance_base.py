@@ -6,7 +6,7 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from pfund_blocks.entities.balances.balance_base import BalanceUpdate, BaseBalance
+from pfund_blocks.entities.balances.balance_base import BaseBalance
 
 SNAPSHOT_FIELDS = {
     "updated_at",
@@ -74,19 +74,15 @@ class TestSnapshot:
         assert snapshot.cash == Decimal("1.5")
         assert isinstance(snapshot.cash, Decimal)
 
-    def test_empty_sets_every_field_to_none(self):
-        snapshot = BaseBalance.Snapshot.empty()
-        assert snapshot.model_dump() == dict.fromkeys(SNAPSHOT_FIELDS)
-
-    def test_empty_includes_subclass_fields(self):
-        snapshot = VenueBalance.Snapshot.empty()
-        assert snapshot.model_dump() == dict.fromkeys(SNAPSHOT_FIELDS | {"bonus"})
+    def test_cash_equity_available_all_none_is_rejected(self):
+        with pytest.raises(ValidationError, match="at least one of"):
+            create_snapshot(cash=None, equity=None, available=None)
 
 
 class TestBaseBalance:
-    def test_new_balance_has_empty_snapshot(self):
+    def test_new_balance_has_no_snapshot(self):
         balance = BaseBalance(currency="USDT")
-        assert balance.snapshot == BaseBalance.Snapshot.empty()
+        assert balance.snapshot is None
         assert balance.updated_at is None
 
     def test_new_balance_can_be_dumped_and_printed(self):
@@ -135,6 +131,18 @@ class TestBaseBalance:
         assert dumped["realized_pnl"] == Decimal("-1")
         assert "updated_at" not in dumped  # a plain property, not a computed field
 
+    def test_pnl_aliases(self):
+        balance = BaseBalance(currency="USDT")
+        balance.on_update(create_snapshot())
+        assert balance.upnl == balance.unrealized_pnl == Decimal("10")
+        assert balance.rpnl == balance.realized_pnl == Decimal("-1")
+
+    def test_aliases_are_not_dumped(self):
+        balance = BaseBalance(currency="USDT")
+        dumped = balance.model_dump()
+        assert "upnl" not in dumped
+        assert "rpnl" not in dumped
+
     def test_str_and_repr(self):
         balance = BaseBalance(currency="USDT")
         balance.on_update(create_snapshot())
@@ -147,11 +155,6 @@ class TestBaseBalance:
 
 
 class TestSubclassSnapshot:
-    def test_new_balance_uses_subclass_snapshot(self):
-        balance = VenueBalance(currency="USDT")
-        assert isinstance(balance.snapshot, VenueBalance.Snapshot)
-        assert balance.snapshot.bonus is None
-
     def test_on_update_with_subclass_snapshot(self):
         balance = VenueBalance(currency="USDT")
         fields = create_snapshot().model_dump()
@@ -162,60 +165,3 @@ class TestSubclassSnapshot:
         balance = VenueBalance(currency="USDT")
         with pytest.raises(ValidationError, match="model_type"):
             balance.on_update(create_snapshot())
-
-
-class TestBalanceUpdate:
-    def create_update(self, **overrides: Any) -> BalanceUpdate[BaseBalance.Snapshot]:
-        fields: dict[str, Any] = {
-            "source": "BYBIT",
-            "account": "main",
-            "received_at": 1_700_000_000_000_000_001,
-            "snapshots": {"USDT": create_snapshot(), "BTC": create_snapshot()},
-        }
-        return BalanceUpdate[BaseBalance.Snapshot](**(fields | overrides))
-
-    def test_create(self):
-        update = self.create_update()
-        assert update.source == "BYBIT"
-        assert update.account == "main"
-        assert update.snapshots["USDT"] == create_snapshot()
-
-    def test_extra_field_is_rejected(self):
-        with pytest.raises(ValidationError, match="extra_forbidden"):
-            self.create_update(oops=1)
-
-    def test_is_frozen(self):
-        update = self.create_update()
-        with pytest.raises(ValidationError, match="frozen_instance"):
-            update.account = "other"  # ty: ignore[invalid-assignment]
-
-    def test_round_trip_through_dict(self):
-        update = self.create_update()
-        assert (
-            BalanceUpdate[BaseBalance.Snapshot].model_validate(update.model_dump())
-            == update
-        )
-
-    def test_round_trip_restores_decimal_from_str(self):
-        # e.g. msgspec msgpack decodes a Decimal as str when sent over zeromq
-        update = self.create_update()
-        data = update.model_dump()
-        data["snapshots"]["USDT"]["cash"] = "100"
-        rebuilt = BalanceUpdate[BaseBalance.Snapshot].model_validate(data)
-        assert rebuilt.snapshots["USDT"].cash == Decimal("100")
-        assert isinstance(rebuilt.snapshots["USDT"].cash, Decimal)
-
-    def test_round_trip_with_subclass_snapshot(self):
-        snapshot = VenueBalance.Snapshot(
-            **create_snapshot().model_dump(), bonus=Decimal("5")
-        )
-        update = BalanceUpdate[VenueBalance.Snapshot](
-            source="BYBIT",
-            account="main",
-            received_at=1,
-            snapshots={"USDT": snapshot},
-        )
-        rebuilt = BalanceUpdate[VenueBalance.Snapshot].model_validate(
-            update.model_dump()
-        )
-        assert rebuilt.snapshots["USDT"].bonus == Decimal("5")
