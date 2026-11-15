@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 from dataclasses import dataclass, field
 from http import HTTPMethod
 
+type TradingVenue = str
 type ProductName = str
 type ResolutionRepr = str  # repr(Resolution), e.g. "1m", "1t", "1q_L1"
 type ResolutionStr = str  # str(Resolution), e.g. "1_MINUTE", "1_TICK", "1_QUOTE_L1"
