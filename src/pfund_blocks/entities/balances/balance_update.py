@@ -14,4 +14,5 @@ class BalanceUpdate[SnapshotT: BaseBalance.Snapshot](BaseModel):
     venue: TradingVenue
     account: AccountName
     received_at: int  # int64 ns since epoch when the message was received
-    snapshots: dict[Currency, SnapshotT]
+    currency: Currency
+    balance: SnapshotT

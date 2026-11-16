@@ -9,6 +9,8 @@
 src = ["..", "../src"]
 
 line-length = 88
+# content notebooks (marimo examples etc.) are demos, not package code
+extend-exclude = ["../afterpython"]
 target-version = "py313"
 
 [lint]
@@ -22,6 +24,10 @@ select = [
 # ignored rules:
 ignore = [
     "E501",  # line too long
+    "N806",  # variable names should be lowercase
+    "RUF059",  # unused-unpacked-variable
+    "N815",  # mixed-case-variable-in-class-scope
+    "N817",  # camelcase-imported-as-acronym
 ]
 # extended rules:
 extend-select = [
@@ -33,6 +39,13 @@ extend-select = [
     "N",     # pep8-naming - enforce naming conventions
     "RUF",   # ruff-specific rules
 ]
+
+[lint.isort]
+combine-as-imports = true
+section-order = ["future", "typing", "standard-library", "third-party", "first-party", "local-folder"]
+
+[lint.isort.sections]
+typing = ["typing", "typing_extensions"]
 
 [format]
 quote-style = "double"  # double quotes for strings

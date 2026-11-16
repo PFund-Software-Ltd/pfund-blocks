@@ -1,24 +1,9 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, ClassVar, Literal, TypedDict
+from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
 if TYPE_CHECKING:
-    from pfund.enums import TradingVenue
-    from pfund.venues.adapter_base import BaseAdapter
-
-    from pfund_blocks.entities.accounts.account_base import BaseAccount
-    from pfund_blocks.entities.products.product_base import BaseProduct
-
-    # TODO
-    class OrderUpdate(TypedDict):
-        source: Literal[
-            "response",  # e.g. place_orders/cancel_orders RESTful API response
-            "order_event",  # e.g. order update from websocket
-            "trade_event",  # e.g. trade update from websocket
-            "get_trade_history",  # update from a specific reconciliation method
-            "get_active_orders",  # update from a specific reconciliation method
-        ]
-
+    from pfund_blocks.typing import TradingVenue
 
 import builtins
 import math
@@ -36,15 +21,16 @@ from pydantic import (
 
 from pfund_blocks.entities.orders.order_status import OrderStatus
 from pfund_blocks.entities.orders.trailing_stop import TrailingStop
+from pfund_blocks.entities.products.product_base import BaseProduct
 from pfund_blocks.entities.trades.quantity import Quantity
 from pfund_blocks.entities.trades.trade import Trade
 from pfund_blocks.enums.order_type import OrderType
 from pfund_blocks.enums.side import Side
 from pfund_blocks.enums.time_in_force import TimeInForce
+from pfund_blocks.typing import AccountName
 from pfund_blocks.utils import trim_trailing_zeros
 
 type OrderKey = str  # order key = client order id
-type StrategyName = str
 
 
 class BaseOrder(BaseModel):
@@ -58,13 +44,13 @@ class BaseOrder(BaseModel):
     # request instead of waiting on an ack that will never arrive.
     SUBMITTED_AS_PENDING: ClassVar[bool] = False
 
-    creator: StrategyName | Literal["USER"] = Field(
+    creator: str | Literal["USER"] = Field(
         description="""
         creator of the order, in most cases it should be a strategy name, e.g. xxx_strategy.
         If it is a manual order placed by the user, it is marked as "USER".
         """,
     )
-    account: BaseAccount
+    account: AccountName
     product: BaseProduct
     status: OrderStatus = Field(default_factory=OrderStatus)
     side: Side | Literal["BUY", "SELL", 1, -1]
@@ -121,8 +107,8 @@ class BaseOrder(BaseModel):
         """,
     )
     time_in_force: TimeInForce | str = TimeInForce.GTC
-    key: OrderKey = Field(
-        default="",
+    order_key: OrderKey = Field(
+        default_factory=lambda: str(uuid4()),
         description="""
         your own identifier for the order, set by you when placing it (auto-generated if omitted).
         This is the client order id sent to the trading venue, as opposed to order_id which is
@@ -141,7 +127,6 @@ class BaseOrder(BaseModel):
     remark: str = ""
 
     def model_post_init(self, __context: Any):
-        self.key = self.key or self._generate_key()
         self.quantity = self._round_to_lot(self.quantity)
         if self.price is not None:
             self.price = self._round_to_tick(self.price, rounding="passive")
@@ -158,6 +143,13 @@ class BaseOrder(BaseModel):
                 self.trailing_stop.limit_offset = self._round_to_tick(
                     self.trailing_stop.limit_offset, rounding="nearest"
                 )
+
+    @field_validator("order_key", mode="after")
+    @classmethod
+    def _validate_key(cls, value: str) -> str:
+        if value == "":
+            raise ValueError("key must not be an empty string")
+        return value
 
     @field_validator("side", mode="before")
     @classmethod
@@ -235,15 +227,15 @@ class BaseOrder(BaseModel):
             )
         return self
 
-    @staticmethod
-    def _generate_key() -> str:
-        return str(uuid4())
-
     def _round_to_lot(self, quantity: Quantity) -> Quantity:
         if self.lot_size is None:
             return quantity
         lot_size = self.lot_size
         rounded_quantity = math.floor(quantity / lot_size) * lot_size
+        if rounded_quantity <= 0:
+            raise ValueError(
+                f"quantity {quantity} is smaller than lot_size {lot_size}; it rounds down to 0"
+            )
         return Quantity(trim_trailing_zeros(rounded_quantity))
 
     def _round_to_tick(
@@ -264,10 +256,6 @@ class BaseOrder(BaseModel):
         else:
             raise ValueError(f"Invalid rounding mode: {rounding}")
         return trim_trailing_zeros(adj_steps * tick_size)
-
-    @property
-    def adapter(self) -> BaseAdapter:
-        return self.venue.venue_class.adapter
 
     @computed_field
     @property
@@ -365,17 +353,17 @@ class BaseOrder(BaseModel):
 
     @property
     def venue(self) -> TradingVenue:
-        from pfund.enums import TradingVenue
-
-        return TradingVenue(self.product.source)
+        return self.product.source
 
     @property
     def tick_size(self) -> Decimal | None:
-        return self.product.market.tick_size if self.product.market else None
+        market = self.product.market
+        return market.tick_size if market else None
 
     @property
     def lot_size(self) -> Decimal | None:
-        return self.product.market.lot_size if self.product.market else None
+        market = self.product.market
+        return market.lot_size if market else None
 
     @property
     def tif(self):
@@ -396,7 +384,7 @@ class BaseOrder(BaseModel):
         return bool(self.trades)
 
     def is_partially_filled(self) -> bool:
-        return self.filled_qty < self.qty
+        return 0 < self.filled_qty < self.qty
 
     is_partial = is_partially_filled
 
@@ -480,8 +468,8 @@ class BaseOrder(BaseModel):
 
     def __str__(self):
         return (
-            f"Creator={self.creator} | Venue={self.venue} | Account={self.account.name} | Product={self.product.name}\n"
-            f"OrderKey={self.key} | OrderID={self.id} | FIXStatus={self.status.FIX} | OrderStatus={self.status}\n"
+            f"Creator={self.creator} | Venue={self.venue} | Account={self.account} | Product={self.product.name}\n"
+            f"OrderKey={self.order_key} | OrderID={self.id} | FIXStatus={self.status.to_FIX()} | OrderStatus={self.status}\n"
             f"OrderType={self.type} | TimeInForce={self.tif} | ReduceOnly={self.reduce_only}\n"
             f"Side={Side(self.side).name} | Price={self.price} | Quantity={self.quantity}\n"
             f"AveragePrice={self.avg_price} | FilledQuantity={self.filled_qty}\n"
@@ -491,8 +479,8 @@ class BaseOrder(BaseModel):
 
     def __repr__(self):
         return (
-            f"{self.creator}|{self.venue}|{self.account.name}|{self.product.name}|"
-            f"{self.key}|{self.id}|{self.status.FIX}|{self.status!r}|"
+            f"{self.creator}|{self.venue}|{self.account}|{self.product.name}|"
+            f"{self.order_key}|{self.id}|{self.status.to_FIX()}|{self.status!r}|"
             f"{self.type}|{self.tif}|{self.size}@{self.price}|"
             f"filled={self.filled_size}@{self.avg_price}|"
             f"last={self.lts}@{self.ltp}|"
@@ -504,7 +492,7 @@ class BaseOrder(BaseModel):
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, BaseOrder):
             return NotImplemented  # Allow other types to define equality with BaseOrder
-        return self.key == other.key
+        return self.order_key == other.order_key
 
     def __hash__(self) -> int:
-        return hash(self.key)
+        return hash(self.order_key)

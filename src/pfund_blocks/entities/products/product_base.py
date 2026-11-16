@@ -12,6 +12,7 @@ from pydantic import (
     model_validator,
 )
 
+from pfund_blocks.entities.markets.market_base import BaseMarket
 from pfund_blocks.entities.products.product_basis import ProductBasis
 from pfund_blocks.entities.products.product_type import ProductType
 
@@ -50,6 +51,14 @@ class BaseProduct(BaseModel):
     name: str = Field(
         default="",
         description="unique product name, if not provided, source + symbol will be used",
+    )
+    market: BaseMarket | None = Field(
+        default=None,
+        description="""
+            the trading venue's market of this product, e.g. tick_size/lot_size.
+            None for a data source, or when the market is not loaded.
+            Not part of the product's identity, i.e. ignored by == and hash().
+        """,
     )
 
     @field_validator("source", "exchange", mode="before")
@@ -135,6 +144,22 @@ class BaseProduct(BaseModel):
             field_name: getattr(self, field_name)
             for field_name in sorted(self.get_allowed_specs())
         }
+
+    # market is excluded from equality and hashing: the same product with or without its market
+    # (or before/after e.g. a tick size change) is still the same product
+    def _identity(self) -> tuple[Any, ...]:
+        return (
+            type(self),
+            *(value for field, value in self.__dict__.items() if field != "market"),
+        )
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, BaseProduct):
+            return NotImplemented
+        return self._identity() == other._identity()
+
+    def __hash__(self) -> int:
+        return hash(self._identity())
 
     def __str__(self) -> str:
         # e.g. BYBIT BTC_USDT_PERPETUAL (symbol=BTCUSDT, name=BYBIT_BTCUSDT)

@@ -1,24 +1,27 @@
 from __future__ import annotations
 
-import time
-from enum import StrEnum
 from typing import ClassVar
 
-from pfund.utils import Timestamp
+import time
+from enum import StrEnum
+
+from pfund_blocks.utils.temporal import Timestamp
+
+type OrderStatusRepr = str
 
 
 class FIX(StrEnum):
-    """The single canonical order status, i.e. FIX OrdStatus (tag 39).
+    """The current order status represented by FIX OrdStatus (tag 39).
 
-    If an order could carry only one status, it would be this one. It is
-    *derived* from the four orthogonal OrderStatus slots (see OrderStatus.FIX),
-    never stored.
+    In this implementation, OrderStatus.to_FIX() derives a single status
+    from the four independent OrderStatus fields rather than storing it.
 
-    Member values are the exact FIX wordings. The enumeration follows
-    FIX 5.0 SP2 (published by the FIX Trading Community as "FIX Latest").
-    The OrdStatus value set has been stable since FIX 4.x; it is pinned
-    here so a future spec change is an explicit edit, not a silent drift.
-    Codes in comments are the on-the-wire tag-39 values.
+    This enumeration follows FIX 5.0 SP2, retaining the deprecated Replaced
+    value for legacy compatibility. FIX Latest is the successor to FIX 5.0
+    SP2 and incorporates subsequent extension packs.
+
+    Member values are human-readable display labels. The single-character
+    codes in comments are the actual on-the-wire tag-39 values.
     """
 
     PENDING_NEW = "Pending New"  # A
@@ -27,7 +30,7 @@ class FIX(StrEnum):
     FILLED = "Filled"  # 2
     DONE_FOR_DAY = "Done for day"  # 3
     CANCELED = "Canceled"  # 4  (FIX uses the US spelling, one 'l')
-    REPLACED = "Replaced"  # 5  (deprecated in FIX 5.0 SP2)
+    REPLACED = "Replaced"  # 5  (deprecated in FIX 4.3)
     PENDING_CANCEL = "Pending Cancel"  # 6
     STOPPED = "Stopped"  # 7
     REJECTED = "Rejected"  # 8
@@ -169,8 +172,48 @@ class OrderStatus:
     def is_amended(self) -> bool:
         return self.amend == OrderStatus.Amend.AMENDED
 
+    @classmethod
+    def parse_repr(
+        cls, status_repr: OrderStatusRepr
+    ) -> tuple[OrderStatus.Category | None, ...]:
+        """Inverse of __repr__, one value per category, "-" -> None.
+
+        e.g. "CPC-" -> (Main.CLOSED, Fill.PARTIAL, Cancel.CANCELLED, None)
+        """
+        if len(status_repr) != len(cls._CATEGORIES):
+            raise ValueError(f"Invalid order status repr: {status_repr!r}")
+        try:
+            # each letter is looked up in its own category, e.g. "C" is Main.CLOSED or Cancel.CANCELLED
+            return tuple(
+                None if letter == "-" else category[letter]
+                for category, letter in zip(cls._CATEGORIES, status_repr, strict=True)
+            )
+        except KeyError:
+            raise ValueError(f"Invalid order status repr: {status_repr!r}") from None
+
     def update(
-        self, status: OrderStatus.Category, ts: float | None = None, reason: str = ""
+        self,
+        status: OrderStatusRepr | OrderStatus.Category,
+        ts: int | None = None,
+        reason: str = "",
+    ) -> bool:
+        """Update the status from a repr (e.g. "CPC-", "-" = unchanged) or a single category value.
+
+        ts is the venue timestamp in nanoseconds since epoch.
+        """
+        # NOTE: check Category first, its members are StrEnums, i.e. also str
+        if isinstance(status, self._CATEGORIES):
+            return self._update_per_category(status, ts=ts, reason=reason)
+        is_updated = False
+        for category_status in self.parse_repr(status):
+            if category_status is not None and self._update_per_category(
+                category_status, ts=ts, reason=reason
+            ):
+                is_updated = True
+        return is_updated
+
+    def _update_per_category(
+        self, status: OrderStatus.Category, ts: int | None = None, reason: str = ""
     ) -> bool:
         is_updated = False
         category = type(status)  # Main / Fill / Cancel / Amend
@@ -180,16 +223,15 @@ class OrderStatus:
         if getattr(self, slot) == status:  # idempotent: same value = no transition
             return is_updated
         setattr(self, slot, status)
-        if ts:
+        if ts is not None:
             self._updated_ats[category] = Timestamp(ts, "venue")
         else:
-            self._updated_ats[category] = Timestamp(time.time(), "pfund")
+            self._updated_ats[category] = Timestamp(time.time_ns(), "pfund")
         self._reasons[category] = reason
         is_updated = True
         return is_updated
 
-    @property
-    def FIX(self) -> FIX | None:  # noqa: N802 (FIX is the protocol name)
+    def to_FIX(self) -> FIX | None:  # noqa: N802 (FIX is the protocol name)
         """Collapse the four orthogonal slots into the single canonical FIX
         OrdStatus (tag 39). Returns None for purely pfund-internal states that
         have no FIX equivalent (e.g. only Main.BLOCKED or Main.MISSED is set).

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from decimal import Decimal
 from typing import Any
+
+from decimal import Decimal
 
 import pytest
 from pydantic import ValidationError
@@ -9,6 +10,7 @@ from pydantic import ValidationError
 from pfund_blocks.entities.positions.position_base import BasePosition
 from pfund_blocks.entities.positions.position_update import PositionUpdate
 from pfund_blocks.entities.trades.quantity import Quantity
+from pfund_blocks.enums.side import Side
 
 
 def create_snapshot(**overrides: Any) -> BasePosition.Snapshot:
@@ -38,7 +40,9 @@ class TestPositionUpdate:
             "venue": "BYBIT",
             "account": "main",
             "received_at": 1_700_000_000_000_000_001,
-            "snapshots": {"BYBIT_BTCUSDT": create_snapshot()},
+            "product": "BYBIT_BTCUSDT",
+            "side": None,
+            "position": create_snapshot(),
         }
         return PositionUpdate[BasePosition.Snapshot](**(fields | overrides))
 
@@ -46,7 +50,13 @@ class TestPositionUpdate:
         update = self.create_update()
         assert update.venue == "BYBIT"
         assert update.account == "main"
-        assert update.snapshots["BYBIT_BTCUSDT"] == create_snapshot()
+        assert update.product == "BYBIT_BTCUSDT"
+        assert update.side is None
+        assert update.position == create_snapshot()
+
+    def test_side_of_hedge_mode_leg(self):
+        update = self.create_update(side="SHORT")
+        assert update.side is Side.SHORT
 
     def test_extra_field_is_rejected(self):
         with pytest.raises(ValidationError, match="extra_forbidden"):
@@ -68,10 +78,10 @@ class TestPositionUpdate:
         # e.g. msgspec msgpack decodes a Decimal as str when sent over zeromq
         update = self.create_update()
         data = update.model_dump()
-        data["snapshots"]["BYBIT_BTCUSDT"]["size"] = "-0.5"
-        data["snapshots"]["BYBIT_BTCUSDT"]["avg_price"] = "95000"
+        data["position"]["size"] = "-0.5"
+        data["position"]["avg_price"] = "95000"
         rebuilt = PositionUpdate[BasePosition.Snapshot].model_validate(data)
-        snapshot = rebuilt.snapshots["BYBIT_BTCUSDT"]
+        snapshot = rebuilt.position
         assert isinstance(snapshot.size, Quantity)
         assert snapshot.avg_price == Decimal("95000")
         assert isinstance(snapshot.avg_price, Decimal)
@@ -82,9 +92,11 @@ class TestPositionUpdate:
             venue="BYBIT",
             account="main",
             received_at=1,
-            snapshots={"BYBIT_BTCUSDT": snapshot},
+            product="BYBIT_BTCUSDT",
+            side=None,
+            position=snapshot,
         )
         rebuilt = PositionUpdate[VenuePosition.Snapshot].model_validate(
             update.model_dump()
         )
-        assert rebuilt.snapshots["BYBIT_BTCUSDT"].adl_rank == 2
+        assert rebuilt.position.adl_rank == 2

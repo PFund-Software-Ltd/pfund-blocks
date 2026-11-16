@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from decimal import Decimal
 from typing import Any
+
+from decimal import Decimal
 
 import pytest
 from pydantic import ValidationError
@@ -35,7 +36,8 @@ class TestBalanceUpdate:
             "venue": "BYBIT",
             "account": "main",
             "received_at": 1_700_000_000_000_000_001,
-            "snapshots": {"USDT": create_snapshot(), "BTC": create_snapshot()},
+            "currency": "USDT",
+            "balance": create_snapshot(),
         }
         return BalanceUpdate[BaseBalance.Snapshot](**(fields | overrides))
 
@@ -43,7 +45,8 @@ class TestBalanceUpdate:
         update = self.create_update()
         assert update.venue == "BYBIT"
         assert update.account == "main"
-        assert update.snapshots["USDT"] == create_snapshot()
+        assert update.currency == "USDT"
+        assert update.balance == create_snapshot()
 
     def test_extra_field_is_rejected(self):
         with pytest.raises(ValidationError, match="extra_forbidden"):
@@ -65,10 +68,10 @@ class TestBalanceUpdate:
         # e.g. msgspec msgpack decodes a Decimal as str when sent over zeromq
         update = self.create_update()
         data = update.model_dump()
-        data["snapshots"]["USDT"]["cash"] = "100"
+        data["balance"]["cash"] = "100"
         rebuilt = BalanceUpdate[BaseBalance.Snapshot].model_validate(data)
-        assert rebuilt.snapshots["USDT"].cash == Decimal("100")
-        assert isinstance(rebuilt.snapshots["USDT"].cash, Decimal)
+        assert rebuilt.balance.cash == Decimal("100")
+        assert isinstance(rebuilt.balance.cash, Decimal)
 
     def test_round_trip_with_subclass_snapshot(self):
         snapshot = VenueBalance.Snapshot(
@@ -78,9 +81,10 @@ class TestBalanceUpdate:
             venue="BYBIT",
             account="main",
             received_at=1,
-            snapshots={"USDT": snapshot},
+            currency="USDT",
+            balance=snapshot,
         )
         rebuilt = BalanceUpdate[VenueBalance.Snapshot].model_validate(
             update.model_dump()
         )
-        assert rebuilt.snapshots["USDT"].bonus == Decimal("5")
+        assert rebuilt.balance.bonus == Decimal("5")

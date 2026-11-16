@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from decimal import Decimal
 from typing import Any, Literal
+
+from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
@@ -13,7 +14,9 @@ from pfund_blocks.typing import Currency
 class Trade(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    timestamp: float
+    executed_at: int = Field(
+        description="int64 ns since epoch, timestamp provided by the venue",
+    )
     trade_id: str
     order_id: str = Field(description="which order this trade belongs to")
     side: Side | Literal["BUY", "SELL", 1, -1]
@@ -30,17 +33,6 @@ class Trade(BaseModel):
         default="",
         description="the native currency the fee was charged in (e.g. BTC), pairs with `fee`",
     )
-    booked_fee: Decimal | None = Field(
-        default=None,
-        description="""
-        the value of `fee` converted into the fund's booking (reporting) currency,
-        frozen at trade time using the price at this trade's timestamp. This is a
-        static historical cost: it must NOT be revalued later (e.g. with an EOD price),
-        otherwise the booking currency's price fluctuation would leak into the fee.
-        Use this for aggregating total fees across trades/products in one common unit.
-        """,
-    )
-    booked_fee_currency: Currency = Field(default="USD")
     is_maker: bool | None = Field(default=None)
 
     @field_validator("side", mode="before")
@@ -69,7 +61,7 @@ class Trade(BaseModel):
 
     def __str__(self) -> str:
         return (
-            f"TradeID={self.trade_id} | OrderID={self.order_id} | Timestamp={self.timestamp}\n"
+            f"TradeID={self.trade_id} | OrderID={self.order_id} | ExecutedAt={self.executed_at}\n"
             f"Side={Side(self.side).name} | Price={self.price} | Quantity={self.quantity}\n"
             f"Fee={self.fee} | FeeCurrency={self.fee_currency} | IsMaker={self.is_maker}"
         )

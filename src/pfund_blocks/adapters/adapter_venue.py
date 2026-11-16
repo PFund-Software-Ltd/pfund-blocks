@@ -9,9 +9,9 @@ from pfund_blocks.adapters.adapter_base import (
     BaseAdapter,
     ExternalValue,
 )
+from pfund_blocks.entities.orders.order_status import OrderStatusRepr
 from pfund_blocks.enums import MarginMode, OrderType, TimeInForce
 
-type OrderStatusRepr = str
 # = field names of VenueAdapter
 type VenueAdapterGroup = (
     AdapterGroup

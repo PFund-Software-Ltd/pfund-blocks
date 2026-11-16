@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from decimal import Decimal
 from typing import ClassVar
+
+from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, computed_field
 
