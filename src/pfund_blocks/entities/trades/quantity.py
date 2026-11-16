@@ -71,7 +71,7 @@ class Quantity(Decimal):
     @staticmethod
     def _get_multiplier(product: BaseProduct) -> Decimal:
         if hasattr(product, "multiplier"):
-            multiplier = cast(Decimal, product.multiplier)  # pyright: ignore[reportAttributeAccessIssue]
+            multiplier = cast(Decimal, product.multiplier)
         else:
             multiplier = Decimal(1)
         return multiplier
