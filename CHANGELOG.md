@@ -1,3 +1,30 @@
+## [0.0.5](https://github.com/PFund-Software-Ltd/pfund-blocks/compare/v0.0.4...v0.0.5) - 2026-11-16
+
+### 🚜 Refactor
+
+- Move entities from pfund
+- *(balances)* Clean up BaseBalance and BalanceUpdate, add tests
+- *(positions)* Clean up BasePosition, DualPosition and PositionUpdate, add tests
+- *(orders)* Add OrderUpdate/TradeUpdate, repr-based status updates, market on product
+
+### 🎨 Styling
+
+- Fix ruff lint in moved entities
+- Fix ruff import order and formatting
+
+### 🧪 Testing
+
+- Use ty's abstract-class-instantiation rule in the MarketData ignore
+- *(trades)* Add Quantity tests
+
+### ⚙️ Miscellaneous Tasks
+
+- Run pixi tests on windows-latest too
+
+### 💼 Other
+
+- Bump afterpython to >=0.5.3 and add it as a dev dependency group
+
 ## [0.0.4](https://github.com/PFund-Software-Ltd/pfund-blocks/compare/v0.0.3...v0.0.4) - 2026-11-09
 
 ### 🐛 Bug Fixes
