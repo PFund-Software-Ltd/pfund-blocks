@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from typing import Any
+
 import pickle
 from datetime import UTC, datetime
-from typing import Any
 
 import msgspec
 import pytest

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from decimal import Decimal
 from typing import Any
+
+from decimal import Decimal
 
 import pytest
 from pydantic import ValidationError

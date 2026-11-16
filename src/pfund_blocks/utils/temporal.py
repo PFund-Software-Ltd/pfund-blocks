@@ -10,7 +10,8 @@ _EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 
 class Timestamp(NamedTuple):
     value: int  # nanoseconds since epoch
-    source: str | Literal['pfund']  # trading venue, or "pfund" if it is generated internally
+    # trading venue, or "pfund" if it is generated internally
+    source: str | Literal["pfund"]
 
 
 def ns_to_dt(ts: int) -> datetime:

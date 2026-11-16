@@ -2,8 +2,9 @@
 # ty: ignore[incompatible-method-override]
 from __future__ import annotations
 
-from decimal import Decimal
 from typing import Any, ClassVar, Literal
+
+from decimal import Decimal
 
 from pydantic import Field, PrivateAttr
 

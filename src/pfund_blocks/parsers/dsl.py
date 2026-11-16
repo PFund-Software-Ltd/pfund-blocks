@@ -75,9 +75,10 @@ Example
 
 from __future__ import annotations
 
+from typing import Any, overload
+
 import reprlib
 from collections.abc import Callable, Sequence
-from typing import Any, overload
 
 type Step = str | Callable[[Any], Any]
 type Path = Sequence[Step]

@@ -19,6 +19,8 @@ class OrderUpdate(BaseModel):
         description="int64 ns since epoch when the order was updated, provided by the venue",
     )
     order_id: str  # venue's order id
-    order_key: OrderKey | None  # None for orders not placed by pfund (e.g. on the venue's UI)
-    status: OrderStatusRepr  # venue status mapped by the parser, e.g. "CPC-", see OrderStatus.__repr__
+    # None for orders not placed by pfund (e.g. on the venue's UI)
+    order_key: OrderKey | None
+    # venue status mapped by the parser, e.g. "CPC-", see OrderStatus.__repr__
+    status: OrderStatusRepr
     reason: str | None = None  # venue's reject/cancel reason, if any

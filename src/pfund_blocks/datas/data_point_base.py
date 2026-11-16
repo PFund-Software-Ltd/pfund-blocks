@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import time
 from typing import Annotated, Any
+
+import time
 
 from msgspec import Meta, Struct, field, structs
 

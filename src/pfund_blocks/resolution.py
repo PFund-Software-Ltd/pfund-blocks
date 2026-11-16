@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import re
 from typing import TYPE_CHECKING, Any, ClassVar
+
+import re
 
 from pfund_blocks.enums.channel import Channel
 from pfund_blocks.enums.timeframe import Timeframe
