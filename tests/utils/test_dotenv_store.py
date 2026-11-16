@@ -132,6 +132,8 @@ class TestEnvDir:
 
     def test_expands_user(self, cwd: Path, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setenv("HOME", str(cwd))
+        # Path.expanduser() reads USERPROFILE on Windows
+        monkeypatch.setenv("USERPROFILE", str(cwd))
         env_dir = cwd / "trading"
         env_dir.mkdir()
         (env_dir / ".env.paper").write_text("KEY=home\n")
