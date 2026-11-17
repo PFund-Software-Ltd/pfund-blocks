@@ -1,38 +1,40 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from pfund_blocks.enums.env import Environment
+    from pfund_blocks.utils import DotenvStore
+
 from pfund_blocks.entities.accounts.account_base import BaseAccount
-from pfund_blocks.enums.env import Environment
 
 
 class APIKeyAccount(BaseAccount):
     def __init__(
         self,
-        env: Environment | str,
         venue: str,
         name: str = "",
         key: str = "",
         secret: str = "",
+        env: Literal[Environment.PAPER, Environment.LIVE] | None = None,
     ):
-        super().__init__(env=env, venue=venue, name=name)
-        self._key: str = key or (self._dotenv.get(f"{self.venue}_API_KEY", "") or "")
-        self._secret: str = secret or (
-            self._dotenv.get(f"{self.venue}_API_SECRET", "") or ""
+        # NOTE: set before super().__init__(), which may call _set_env() and needs them
+        self._key: str = key
+        self._secret: str = secret
+        super().__init__(venue=venue, name=name, env=env)
+
+    def _load_credentials(self, dotenv: DotenvStore):
+        self._key = self._key or (dotenv.get(f"{self.venue}_API_KEY", "") or "")
+        self._secret = self._secret or (
+            dotenv.get(f"{self.venue}_API_SECRET", "") or ""
         )
 
-    def _assert_credentials_provided_in_paper_or_live_trading_env(self):
+    def _assert_credentials_provided(self):
         if not self._key or not self._secret:
             raise ValueError(
                 f"{self.venue} API KEY and SECRET must be provided, \n"
-                + f"please set `{self.venue}_API_KEY` and `{self.venue}_API_SECRET` in .env.{self._env.lower()} file,\n"
+                + f"please set `{self.venue}_API_KEY` and `{self.venue}_API_SECRET` in .env.{self.env.lower()} file,\n"
                 + "or by strategy.add_account(..., key=..., secret=...)"
-            )
-
-    def _assert_no_credential_leak_in_backtest_env(self):
-        if self._key or self._secret:
-            raise ValueError(
-                f"{self.venue} API KEY and SECRET should NOT be provided for {self._env} environment, \n"
-                + f"please remove them in .env.{self._env.lower()} file (if any),\n"
-                + "or remove key= and secret= from strategy.add_account()"
             )
 
     @property

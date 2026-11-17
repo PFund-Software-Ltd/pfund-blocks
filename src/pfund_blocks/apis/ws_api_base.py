@@ -31,7 +31,7 @@ from websockets.asyncio.client import ClientConnection
 from websockets.exceptions import ConnectionClosed, ConnectionClosedError
 
 from pfund_blocks.enums import Channel, ChannelType, Environment, PrivateChannel
-from pfund_blocks.typing import ChannelInfo
+from pfund_blocks.typing import ChannelInfo, TradingVenue
 
 
 class WebSocket(ClientConnection):
@@ -39,7 +39,9 @@ class WebSocket(ClientConnection):
 
 
 class BaseWebSocketAPI[AccountT: BaseAccount = BaseAccount](ABC):
-    venue: ClassVar[str]  # upper case, consistent with BaseRestAPI.venue, e.g. "BYBIT"
+    venue: ClassVar[
+        TradingVenue
+    ]  # upper case, consistent with BaseRestAPI.venue, e.g. "BYBIT"
     urls: ClassVar[
         dict[Literal[Environment.PAPER, Environment.LIVE], dict[ChannelType, str]]
     ]

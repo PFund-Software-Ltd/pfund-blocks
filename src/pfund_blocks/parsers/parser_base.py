@@ -3,8 +3,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, ClassVar
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from pfund_blocks.adapters.adapter_base import BaseAdapter
-    from pfund_blocks.entities.markets.market_base import MarketDict
+    from pfund_blocks.entities.markets.market_base import BaseMarket
     from pfund_blocks.enums import Channel
     from pfund_blocks.typing import (
         DecodedMessage,
@@ -100,7 +102,8 @@ class BaseParser:
             f"{type(self).__name__} does not implement parse_message_error()"
         )
 
-    def parse_markets(self, response: RawResponse) -> list[MarketDict]:
+    # NOTE: Sequence since it is covariant, so a venue can return its own market class, e.g. list[BybitMarket]
+    def parse_markets(self, response: RawResponse) -> Sequence[BaseMarket]:
         raise NotImplementedError(
             f"{type(self).__name__} does not implement parse_markets()"
         )

@@ -1,3 +1,10 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from pfund_blocks.adapters.adapter_base import BaseAdapter
+
 from pfund_blocks.entities.products.fund import ETFProduct, MutualFundProduct
 from pfund_blocks.entities.products.future import FutureProduct, PerpetualProduct
 from pfund_blocks.entities.products.index import IndexProduct
@@ -40,3 +47,42 @@ def ProductFactory(basis: str | ProductBasis) -> type[BaseProduct]:  # noqa: N80
     if product_type.asset_type not in _PRODUCTS:
         raise ValueError(f"no product class for {product_type!r} yet")
     return _PRODUCTS[product_type.asset_type]
+
+
+def create_product(
+    source: str,
+    basis: str | ProductBasis,
+    adapter: BaseAdapter | None = None,
+    symbol: str = "",
+    name: str = "",
+    **specs: Any,
+) -> BaseProduct:
+    """Creates a product with the source's symbol and name, and maps them in the adapter's group "product".
+
+    Shared by pfund-blocks' BaseVenue.create_product() and pfeed's BaseSource.create_product().
+
+    Args:
+        source: where the product comes from, e.g. a trading venue "BYBIT" or a data source "YAHOO_FINANCE"
+        basis: e.g. "BTC_USDT_PERP"
+        adapter: the source's adapter, if None, the product class's own conventions are used and nothing is mapped
+        symbol: the source's symbol, if not provided, derived by the adapter's create_symbol(),
+            pass it when the derived symbol is wrong
+        name: unique product name, if not provided, derived by the adapter's create_name()
+        specs: the product class's specs, e.g. expiration for a future
+    """
+    Product = ProductFactory(basis)
+    # the adapter is passed via the validation context, so that the product derives its symbol and name
+    # with the source's conventions once its specs are validated (e.g. expiration as a date)
+    product = Product.model_validate(
+        {
+            "source": source,
+            "basis": basis,
+            "symbol": symbol,
+            "name": name,
+            **specs,
+        },
+        context={"adapter": adapter},
+    )
+    if adapter is not None:
+        adapter.add_mapping(product.name, product.symbol, group="product")
+    return product

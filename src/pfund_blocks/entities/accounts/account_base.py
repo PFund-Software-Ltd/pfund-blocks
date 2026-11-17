@@ -5,27 +5,12 @@ from typing import TYPE_CHECKING, Any, ClassVar
 if TYPE_CHECKING:
     from pfund_blocks.utils import DotenvStore
 
-from abc import ABC, ABCMeta, abstractmethod
+from abc import ABC, abstractmethod
 
 from pfund_blocks.enums.env import Environment
 
 
-class _AccountMeta(ABCMeta):
-    def __call__[AccountT: BaseAccount](
-        cls: type[AccountT], *args: Any, **kwargs: Any
-    ) -> AccountT:
-        # run the checks after the whole __init__ chain, when subclasses have set their credentials
-        account = super().__call__(*args, **kwargs)
-        if account.env == Environment.BACKTEST:
-            account._assert_no_credential_leak_in_backtest_env()
-        else:
-            account._assert_credentials_provided_in_paper_or_live_trading_env()
-        # only needed while constructing, don't carry the whole .env file around (e.g. when pickled to Ray workers)
-        del account._dotenv
-        return account
-
-
-class BaseAccount(ABC, metaclass=_AccountMeta):
+class BaseAccount(ABC):
     _num: ClassVar[int] = 0
 
     @classmethod
@@ -36,30 +21,54 @@ class BaseAccount(ABC, metaclass=_AccountMeta):
     def _get_default_name(self) -> str:
         return f"{self.__class__.__name__}-{self._next_id()}"
 
-    def __init__(self, env: Environment | str, venue: str, name: str = ""):
+    def __init__(
+        self,
+        venue: str,
+        name: str = "",
+        env: Environment | str | None = None,
+    ):
         """
         Args:
-            env: The environment the account is in.
             venue: The trading venue of the account.
             name: The name of the account.
+            env: The environment the account is in, only env=PAPER or env=LIVE.
+                If None, it is set internally by the engine when the account is added.
         """
-        from pfund_blocks.utils import DotenvStore
-
-        self._env = Environment(env.upper())
+        self._env: Environment | None = None
         self._venue: str = venue.upper()
         self._name: str = name or self._get_default_name()
-        self._dotenv: DotenvStore | dict[str, str] = (
-            DotenvStore(env=self._env) if self._env != Environment.BACKTEST else {}
-        )
+        # NOTE: _set_env() loads and checks the credentials, so subclasses must set theirs BEFORE calling super().__init__()
+        if env is not None:
+            self._set_env(env)
+
+    def _set_env(self, env: Environment | str):
+        from pfund_blocks.utils import DotenvStore
+
+        if self._env is not None:
+            raise ValueError(f"{self!r} already has env={self._env}, cannot set {env=}")
+        _env = Environment(env.upper())
+        # NOTE: a real account only exists in env=PAPER/LIVE, env=BACKTEST/SANDBOX use pfund's SimulatedAccount instead
+        if _env.is_simulated():
+            raise ValueError(
+                f"{self.__class__.__name__} only supports env=PAPER or env=LIVE, got {env=}, "
+                + "use pf.SimulatedAccount for env=BACKTEST or env=SANDBOX"
+            )
+        self._env = _env
+        # NOTE: the dotenv store is local, so the whole .env file isn't carried around (e.g. when pickled to Ray workers)
+        self._load_credentials(DotenvStore(env=self._env))
+        self._assert_credentials_provided()
 
     @abstractmethod
-    def _assert_no_credential_leak_in_backtest_env(self) -> None: ...
+    def _load_credentials(self, dotenv: DotenvStore) -> None:
+        """Fills in the credentials not passed in explicitly from the env's .env file."""
+        ...
 
     @abstractmethod
-    def _assert_credentials_provided_in_paper_or_live_trading_env(self) -> None: ...
+    def _assert_credentials_provided(self) -> None: ...
 
     @property
     def env(self) -> Environment:
+        assert self._env is not None, "env is not set"
         return self._env
 
     @property
@@ -71,19 +80,19 @@ class BaseAccount(ABC, metaclass=_AccountMeta):
         return self._name
 
     def __str__(self) -> str:
-        return f"Env={self._env} | Venue={self._venue} | Account={self._name}"
+        return f"Env={self.env} | Venue={self._venue} | Account={self._name}"
 
     def __repr__(self) -> str:
-        return ":".join([self._env, self._venue, self._name])
+        return ":".join([self.env, self._venue, self._name])
 
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, BaseAccount):
             return NotImplemented
         return (
-            self._env == other._env
+            self.env == other.env
             and self._venue == other._venue
             and self._name == other._name
         )
 
     def __hash__(self) -> int:
-        return hash((self._env, self._venue, self._name))
+        return hash((self.env, self._venue, self._name))

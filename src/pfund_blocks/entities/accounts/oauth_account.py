@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from pfund_blocks.enums.env import Environment
+    from pfund_blocks.utils import DotenvStore
+
 from pfund_blocks.entities.accounts.account_base import BaseAccount
-from pfund_blocks.enums.env import Environment
 
 
 # TODO: for FUTURE integration with the US brokers — Tradier, TradeStation, Schwab, Tradovate.
@@ -16,29 +21,25 @@ class OAuthAccount(BaseAccount):
 
     def __init__(
         self,
-        env: Environment | str,
         venue: str,
         name: str = "",
         token: str = "",
+        env: Literal[Environment.PAPER, Environment.LIVE] | None = None,
     ):
-        super().__init__(env=env, venue=venue, name=name)
-        self._token: str = token or (
-            self._dotenv.get(f"{self.venue}_ACCESS_TOKEN", "") or ""
+        # NOTE: set before super().__init__(), which may call _set_env() and needs it
+        self._token: str = token
+        super().__init__(venue=venue, name=name, env=env)
+
+    def _load_credentials(self, dotenv: DotenvStore):
+        self._token = self._token or (
+            dotenv.get(f"{self.venue}_ACCESS_TOKEN", "") or ""
         )
 
-    def _assert_no_credential_leak_in_backtest_env(self):
-        if self._token:
-            raise ValueError(
-                f"{self.venue} ACCESS TOKEN should NOT be provided for {self._env} environment, \n"
-                + f"please remove it in .env.{self._env.lower()} file (if any),\n"
-                + "or remove token= from strategy.add_account()"
-            )
-
-    def _assert_credentials_provided_in_paper_or_live_trading_env(self):
+    def _assert_credentials_provided(self):
         if not self._token:
             raise ValueError(
                 f"{self.venue} ACCESS TOKEN must be provided, \n"
-                + f"please set `{self.venue}_ACCESS_TOKEN` in .env.{self._env.lower()} file,\n"
+                + f"please set `{self.venue}_ACCESS_TOKEN` in .env.{self.env.lower()} file,\n"
                 + "or by strategy.add_account(..., token=...)"
             )
 

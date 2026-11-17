@@ -22,11 +22,13 @@ from json import JSONDecodeError
 from httpx2 import AsyncClient, RequestError
 
 from pfund_blocks.enums.env import Environment
-from pfund_blocks.typing import Endpoint, Reply, Request
+from pfund_blocks.typing import Endpoint, Reply, Request, TradingVenue
 
 
 class BaseRestAPI[AccountT: BaseAccount = BaseAccount]:
-    venue: ClassVar[str]  # upper case, consistent with BaseAccount.venue, e.g. "BYBIT"
+    venue: ClassVar[
+        TradingVenue
+    ]  # upper case, consistent with BaseAccount.venue, e.g. "BYBIT"
     urls: ClassVar[dict[Literal[Environment.PAPER, Environment.LIVE], str]]
     version: ClassVar[str | None] = (
         None  # e.g. "v5" for Bybit, None if the venue's API is not versioned

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -120,7 +120,9 @@ def create_product(symbol: str = "BTCUSDT", name: str = "") -> BaseProduct:
 
 
 def create_account(
-    env: str = "LIVE", venue: str = "DUMMY", name: str = "acc"
+    env: Literal[Environment.PAPER, Environment.LIVE] = Environment.LIVE,
+    venue: str = "DUMMY",
+    name: str = "acc",
 ) -> APIKeyAccount:
     return APIKeyAccount(env=env, venue=venue, name=name, key="key", secret="secret")
 
@@ -152,7 +154,7 @@ class TestAddAccount:
 
     def test_env_mismatch_raises(self, api: DummyWebSocketAPI):
         with pytest.raises(ValueError, match="does not match websocket env"):
-            api.add_account(create_account(env="PAPER"))
+            api.add_account(create_account(env=Environment.PAPER))
 
     def test_venue_mismatch_raises(self, api: DummyWebSocketAPI):
         with pytest.raises(ValueError, match="does not match websocket venue"):

@@ -1,11 +1,7 @@
 # NOTE: no `from __future__ import annotations` here, the classes below must hold real types, not strings.
 # Otherwise msgspec on Python 3.14 resolves the inherited string annotations of a TypedDict subclass
 # (e.g. pfeed's MarketDataMessage(Message)) in the subclass's module, raising NameError for e.g. AccountName.
-from typing import TYPE_CHECKING, Any, NamedTuple, TypedDict
-
-if TYPE_CHECKING:
-    # only used in a lazy `type` alias, so it can stay typing-only
-    from pfund_blocks.entities.markets.market_base import MarketDict
+from typing import Any, NamedTuple, TypedDict
 
 from dataclasses import dataclass, field
 from http import HTTPMethod
@@ -23,8 +19,7 @@ type RawMessage = bytes | str  # the venue's message as received
 type DecodedMessage = Any  # the venue's decoded but unparsed message, e.g. JSON decoded
 type ParsedMessage = Any  # the message parsed by the venue's parser
 type RawResponse = Any  # the venue's decoded but unparsed response
-# the response parsed by the venue's parser, a union of the standardized outputs, e.g. parse_markets -> list[MarketDict]
-type ParsedResponse = list[MarketDict]
+type ParsedResponse = Any  # the response parsed by the venue's parser, e.g. parse_markets -> Sequence[BaseMarket]
 
 
 class Endpoint(NamedTuple):
