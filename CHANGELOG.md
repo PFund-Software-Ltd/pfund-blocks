@@ -1,3 +1,10 @@
+## [0.0.6](https://github.com/PFund-Software-Ltd/pfund-blocks/compare/v0.0.5...v0.0.6) - 2026-11-18
+
+### 🚀 Features
+
+- *(enums)* Add SANDBOX to Environment
+- *(venues)* Fetch and cache markets, attach them to products
+
 ## [0.0.5](https://github.com/PFund-Software-Ltd/pfund-blocks/compare/v0.0.4...v0.0.5) - 2026-11-16
 
 ### 🚜 Refactor
