@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any, override
 
 if TYPE_CHECKING:
+    from collections.abc import Hashable
+
     from pfund_blocks.entities.products.product_base import BaseProduct
 
 from datetime import datetime
@@ -162,17 +164,11 @@ class BarData(MarketData):
             "shift": self.shift,
         }
 
-    def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, BarData):
-            return NotImplemented
-        return (self.product, self.resolution, self._shift_ns) == (
-            other.product,
-            other.resolution,
-            other._shift_ns,
-        )
-
-    def __hash__(self):
-        return hash((self.product, self.resolution, self._shift_ns))
+    @property
+    @override
+    def key(self) -> tuple[Hashable, ...]:
+        # bars with different shifts are different data
+        return (self.product, self.resolution, self._shift_ns)
 
     def __str__(self):
         if self._bar is None:

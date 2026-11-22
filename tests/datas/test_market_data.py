@@ -33,9 +33,37 @@ def create_data(resolution: str = "1m", symbol: str = "BTCUSDT") -> DummyData:
     return DummyData(create_product(symbol), Resolution(resolution))
 
 
+class KeyedData(BaseData):
+    def __init__(self, key: str):
+        self._key = key
+
+    @property
+    def key(self) -> str:
+        return self._key
+
+
 class TestBaseData:
     def test_to_dict_is_empty(self):
-        assert BaseData().to_dict() == {}
+        assert KeyedData("a").to_dict() == {}
+
+    def test_subclass_without_key_cannot_be_created(self):
+        class NoKeyData(BaseData):
+            pass
+
+        with pytest.raises(TypeError, match="abstract"):
+            NoKeyData()  # ty: ignore[abstract-class-instantiation]
+
+    def test_eq_and_hash_follow_key(self):
+        assert KeyedData("a") == KeyedData("a")
+        assert hash(KeyedData("a")) == hash(KeyedData("a"))
+        assert KeyedData("a") != KeyedData("b")
+        assert len({KeyedData("a"), KeyedData("a")}) == 1
+
+    def test_different_types_with_same_key_are_not_equal(self):
+        class OtherKeyedData(KeyedData):
+            pass
+
+        assert KeyedData("a") != OtherKeyedData("a")
 
 
 class TestMarketData:

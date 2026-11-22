@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from collections.abc import Hashable
+
     from pfund_blocks.datas.bar_data import BarData, ClosedBar
     from pfund_blocks.datas.tick_data import TickData
     from pfund_blocks.entities.products.product_base import BaseProduct
@@ -29,13 +31,10 @@ class MarketData(BaseData, ABC):
             "resolution": repr(self.resolution),
         }
 
-    def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, MarketData):
-            return NotImplemented
-        return (self.product, self.resolution) == (other.product, other.resolution)
-
-    def __hash__(self):
-        return hash((self.product, self.resolution))
+    @property
+    def key(self) -> tuple[Hashable, ...]:
+        # subclasses may extend it, e.g. BarData adds its shift
+        return (self.product, self.resolution)
 
     def __str__(self):
         return f"[{type(self).__name__}] {self.product.name} | {self.resolution}"
