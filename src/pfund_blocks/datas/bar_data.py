@@ -143,18 +143,28 @@ type ClosedBar = Bar  # a Bar with is_closed=True
 
 
 class BarData(MarketData):
-    def __init__(self, product: BaseProduct, resolution: Resolution, shift: str = ""):
+    def __init__(
+        self,
+        product: BaseProduct,
+        resolution: Resolution,
+        shift: str = "",
+        *,
+        source: str = "",
+        origin: str = "",
+    ):
         """
         Args:
             shift: a duration, e.g. '30m', see get_bar_window(). A venue's bar can't be shifted afterwards,
                 so update() rejects a bar that is not in the shifted window.
+            source: see MarketData.
+            origin: see MarketData.
         """
         if not resolution.is_bar():
             raise ValueError(f"{resolution!r} is not a bar resolution")
         # raises if the shift is invalid for the resolution
         # compare shifts in ns, e.g. '2h' and '120m' are the same shift
         self._shift_ns: int = parse_shift(resolution, shift)
-        super().__init__(product, resolution)
+        super().__init__(product, resolution, source=source, origin=origin)
         self.shift: str = shift
         self._bar: Bar | None = None
 
@@ -167,8 +177,8 @@ class BarData(MarketData):
     @property
     @override
     def key(self) -> tuple[Hashable, ...]:
-        # bars with different shifts are different data
-        return (self.product, self.resolution, self._shift_ns)
+        # extends MarketData's key (source, origin, product, resolution): bars with different shifts are different data
+        return (*super().key, self._shift_ns)
 
     def __str__(self):
         if self._bar is None:
@@ -230,6 +240,11 @@ class BarData(MarketData):
         if resampler.product != self.product:
             raise ValueError(
                 f"resampler's product {resampler.product} does not match {self.product}"
+            )
+        if (resampler.source, resampler.origin) != (self.source, self.origin):
+            raise ValueError(
+                f"resampler's source/origin {resampler.source}/{resampler.origin!r} does not match "
+                + f"{self.source}/{self.origin!r}, data can't be resampled from another source"
             )
         if resampler.resolution <= self.resolution:
             raise ValueError(

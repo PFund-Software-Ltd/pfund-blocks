@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 if TYPE_CHECKING:
     from collections.abc import Hashable
@@ -13,12 +13,31 @@ if TYPE_CHECKING:
 from abc import ABC, abstractmethod
 
 from pfund_blocks.datas.data_base import BaseData
+from pfund_blocks.enums.data_category import DataCategory
 
 
 class MarketData(BaseData, ABC):
-    def __init__(self, product: BaseProduct, resolution: Resolution):
+    category: ClassVar[DataCategory] = DataCategory.MARKET_DATA
+
+    def __init__(
+        self,
+        product: BaseProduct,
+        resolution: Resolution,
+        *,
+        source: str = "",
+        origin: str = "",
+    ):
+        """
+        Args:
+            source: where the data comes from, e.g. a trading venue ('BYBIT') or a data vendor ('DATABENTO').
+                Optional ("" means unspecified), the data works without it. It is part of the data's identity,
+                e.g. BTC 1m bars from BYBIT and from DATABENTO are different data.
+            origin: a sub-label for data from the same source but different origins, e.g. pfeed's data_origin.
+        """
         self.product: BaseProduct = product
         self.resolution: Resolution = resolution
+        self.source: str = source.upper()
+        self.origin: str = origin
         self._resampler: TickData | BarData | None = (
             None  # data used to be resampled into this data
         )
@@ -29,12 +48,14 @@ class MarketData(BaseData, ABC):
             **super().to_dict(),
             "product": self.product.model_dump(),
             "resolution": repr(self.resolution),
+            "source": self.source,
+            "origin": self.origin,
         }
 
     @property
     def key(self) -> tuple[Hashable, ...]:
         # subclasses may extend it, e.g. BarData adds its shift
-        return (self.product, self.resolution)
+        return (self.source, self.origin, self.product, self.resolution)
 
     def __str__(self):
         return f"[{type(self).__name__}] {self.product.name} | {self.resolution}"

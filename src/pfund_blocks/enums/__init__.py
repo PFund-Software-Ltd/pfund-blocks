@@ -5,6 +5,7 @@ from pfund_blocks.enums.channel import (
     PrivateChannel,
     PublicChannel,
 )
+from pfund_blocks.enums.data_category import DataCategory
 from pfund_blocks.enums.env import Environment
 from pfund_blocks.enums.margin_mode import MarginMode
 from pfund_blocks.enums.month_code import CryptoMonthCode, FutureMonthCode
@@ -22,6 +23,7 @@ __all__ = [
     "Channel",
     "ChannelType",
     "CryptoMonthCode",
+    "DataCategory",
     "Environment",
     "FutureMonthCode",
     "MarginMode",

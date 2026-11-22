@@ -38,10 +38,17 @@ class Tick(BaseDataPoint, kw_only=True, frozen=True):
 
 
 class TickData(MarketData):
-    def __init__(self, product: BaseProduct, resolution: Resolution):
+    def __init__(
+        self,
+        product: BaseProduct,
+        resolution: Resolution,
+        *,
+        source: str = "",
+        origin: str = "",
+    ):
         if not resolution.is_tick():
             raise ValueError(f"{resolution!r} is not a tick resolution")
-        super().__init__(product, resolution)
+        super().__init__(product, resolution, source=source, origin=origin)
         self._tick: Tick | None = None
 
     @property

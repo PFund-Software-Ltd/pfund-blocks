@@ -107,6 +107,8 @@ class TestTickDataInit:
         assert data.to_dict() == {
             "product": data.product.model_dump(),
             "resolution": "1t",
+            "source": "",
+            "origin": "",
         }
 
 

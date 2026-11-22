@@ -61,10 +61,17 @@ class OrderBook:
 
 
 class QuoteData(MarketData):
-    def __init__(self, product: BaseProduct, resolution: Resolution):
+    def __init__(
+        self,
+        product: BaseProduct,
+        resolution: Resolution,
+        *,
+        source: str = "",
+        origin: str = "",
+    ):
         if not resolution.is_quote():
             raise ValueError(f"{resolution!r} is not a quote resolution")
-        super().__init__(product, resolution)
+        super().__init__(product, resolution, source=source, origin=origin)
         self._quote: Quote | None = None
 
     @property

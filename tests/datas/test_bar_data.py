@@ -347,6 +347,8 @@ class TestBarDataIdentity:
         assert m5.to_dict() == {
             "product": m5.product.model_dump(),
             "resolution": "5m",
+            "source": "",
+            "origin": "",
             "shift": "30s",
         }
 
@@ -369,6 +371,24 @@ class TestBarDataStr:
 
 
 class TestBindResampler:
+    def test_resampler_from_another_source_is_rejected(self):
+        m5 = BarData(create_product(), Resolution("5m"), source="BYBIT")
+        m1 = BarData(create_product(), Resolution("1m"), source="DATABENTO")
+        with pytest.raises(ValueError, match="can't be resampled from another source"):
+            m5.bind_resampler(m1)
+
+    def test_resampler_from_another_origin_is_rejected(self):
+        m5 = BarData(create_product(), Resolution("5m"), source="BYBIT", origin="a")
+        m1 = BarData(create_product(), Resolution("1m"), source="BYBIT", origin="b")
+        with pytest.raises(ValueError, match="can't be resampled from another source"):
+            m5.bind_resampler(m1)
+
+    def test_shift_and_source_are_both_part_of_the_key(self):
+        a = BarData(create_product(), Resolution("5m"), shift="30s", source="BYBIT")
+        b = BarData(create_product(), Resolution("5m"), source="BYBIT")
+        c = BarData(create_product(), Resolution("5m"), shift="30s", source="DATABENTO")
+        assert len({a, b, c}) == 3
+
     @pytest.mark.parametrize(
         "resolution, shift, resampler_resolution, resampler_shift",
         [

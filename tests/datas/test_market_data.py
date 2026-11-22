@@ -10,6 +10,7 @@ from pfund_blocks.datas.data_base import BaseData
 from pfund_blocks.datas.market_data import MarketData
 from pfund_blocks.datas.tick_data import Tick
 from pfund_blocks.entities.products.product_base import BaseProduct
+from pfund_blocks.enums import DataCategory
 from pfund_blocks.resolution import Resolution
 from pfund_blocks.utils.temporal import NS_PER_SECOND
 
@@ -34,6 +35,8 @@ def create_data(resolution: str = "1m", symbol: str = "BTCUSDT") -> DummyData:
 
 
 class KeyedData(BaseData):
+    category = DataCategory.MARKET_DATA
+
     def __init__(self, key: str):
         self._key = key
 
@@ -48,10 +51,24 @@ class TestBaseData:
 
     def test_subclass_without_key_cannot_be_created(self):
         class NoKeyData(BaseData):
-            pass
+            category = DataCategory.MARKET_DATA
 
         with pytest.raises(TypeError, match="abstract"):
             NoKeyData()  # ty: ignore[abstract-class-instantiation]
+
+    def test_subclass_without_category_cannot_be_defined(self):
+        with pytest.raises(TypeError, match="must declare its data category"):
+
+            class NoCategoryData(BaseData):
+                @property
+                def key(self) -> str:
+                    return ""
+
+    def test_category_is_inherited(self):
+        class OtherKeyedData(KeyedData):
+            pass
+
+        assert OtherKeyedData.category == DataCategory.MARKET_DATA
 
     def test_eq_and_hash_follow_key(self):
         assert KeyedData("a") == KeyedData("a")
@@ -67,6 +84,10 @@ class TestBaseData:
 
 
 class TestMarketData:
+    def test_category_is_market_data(self):
+        assert MarketData.category == DataCategory.MARKET_DATA
+        assert create_data().category == DataCategory.MARKET_DATA
+
     def test_is_abstract(self):
         with pytest.raises(TypeError, match="abstract"):
             MarketData(create_product(), Resolution("1m"))  # ty: ignore[abstract-class-instantiation]
@@ -76,6 +97,8 @@ class TestMarketData:
         assert data.to_dict() == {
             "product": data.product.model_dump(),
             "resolution": "5m",
+            "source": "",
+            "origin": "",
         }
 
     def test_str(self):
@@ -121,3 +144,37 @@ class TestEqualityAndHash:
         resampler = pickled_m5.get_resampler()
         assert resampler == m1
         assert resampler.get_resamplees()[0] is pickled_m5
+
+
+class TestSourceAndOrigin:
+    def test_source_and_origin_are_optional(self):
+        data = create_data()
+        assert data.source == ""
+        assert data.origin == ""
+
+    def test_source_is_uppercased(self):
+        data = DummyData(create_product(), Resolution("1m"), source="databento")
+        assert data.source == "DATABENTO"
+
+    def test_different_source_is_different_data(self):
+        bybit = DummyData(create_product(), Resolution("1m"), source="BYBIT")
+        databento = DummyData(create_product(), Resolution("1m"), source="DATABENTO")
+        assert bybit != databento
+        assert len({bybit, databento}) == 2
+
+    def test_different_origin_is_different_data(self):
+        a = DummyData(create_product(), Resolution("1m"), source="BYBIT", origin="a")
+        b = DummyData(create_product(), Resolution("1m"), source="BYBIT", origin="b")
+        assert a != b
+
+    def test_same_source_and_origin_are_equal(self):
+        a = DummyData(create_product(), Resolution("1m"), source="bybit", origin="x")
+        b = DummyData(create_product(), Resolution("1m"), source="BYBIT", origin="x")
+        assert a == b
+        assert hash(a) == hash(b)
+
+    def test_pickling_keeps_source_and_origin(self):
+        data = DummyData(create_product(), Resolution("1m"), source="BYBIT", origin="x")
+        copy = pickle.loads(pickle.dumps(data))
+        assert (copy.source, copy.origin) == ("BYBIT", "x")
+        assert copy == data
