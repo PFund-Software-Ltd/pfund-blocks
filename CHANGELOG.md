@@ -1,3 +1,13 @@
+## [0.0.7](https://github.com/PFund-Software-Ltd/pfund-blocks/compare/v0.0.6...v0.0.7) - 2026-11-22
+
+### 🚀 Features
+
+- *(datas)* Add source/origin and DataCategory to data
+
+### 🚜 Refactor
+
+- *(datas)* Derive data equality and hashing from an abstract key
+
 ## [0.0.6](https://github.com/PFund-Software-Ltd/pfund-blocks/compare/v0.0.5...v0.0.6) - 2026-11-18
 
 ### 🚀 Features
