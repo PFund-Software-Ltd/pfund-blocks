@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from pfund_blocks.adapters.adapter_base import BaseAdapter
 
+from pydantic import ValidationError
+
 from pfund_blocks.entities.products.fund import ETFProduct, MutualFundProduct
 from pfund_blocks.entities.products.future import FutureProduct, PerpetualProduct
 from pfund_blocks.entities.products.index import IndexProduct
@@ -69,20 +71,39 @@ def create_product(
             pass it when the derived symbol is wrong
         name: unique product name, if not provided, derived by the adapter's create_name()
         specs: the product class's specs, e.g. expiration for a future
+
+    Raises:
+        TypeError: if specs contain fields the product class does not have,
+            e.g. a typo of a caller's parameter that fell into **specs
     """
     Product = ProductFactory(basis)
-    # the adapter is passed via the validation context, so that the product derives its symbol and name
-    # with the source's conventions once its specs are validated (e.g. expiration as a date)
-    product = Product.model_validate(
-        {
-            "source": source,
-            "basis": basis,
-            "symbol": symbol,
-            "name": name,
-            **specs,
-        },
-        context={"adapter": adapter},
-    )
+    try:
+        # the adapter is passed via the validation context, so that the product derives its symbol and name
+        # with the source's conventions once its specs are validated (e.g. expiration as a date)
+        product = Product.model_validate(
+            {
+                "source": source,
+                "basis": basis,
+                "symbol": symbol,
+                "name": name,
+                **specs,
+            },
+            context={"adapter": adapter},
+        )
+    except ValidationError as err:
+        # callers usually forward their unknown kwargs as **specs,
+        # so a typo of their parameter surfaces as pydantic's "Extra inputs are not permitted"
+        unknown = [
+            str(e["loc"][0])
+            for e in err.errors()
+            if e["type"] == "extra_forbidden" and e["loc"]
+        ]
+        if not unknown:
+            raise
+        raise TypeError(
+            f"unexpected product spec(s) {unknown} for '{basis}': {Product.__name__} does not have them. "
+            f"If they were passed as extra kwargs, is it a typo of a parameter?"
+        ) from err
     if adapter is not None:
         adapter.add_mapping(product.name, product.symbol, group="product")
     return product
